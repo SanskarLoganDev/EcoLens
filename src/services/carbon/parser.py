@@ -277,7 +277,7 @@ if __name__ == "__main__":
     import json
 
     # Path to sample CSV (adjust as needed)
-    csv_path = "src/services/carbon/sample_transactions.csv"
+    csv_path = "src/services/carbon/samples/sample_transactions_5.csv"
     
     # Create parser instance
     parser = TransactionParser()

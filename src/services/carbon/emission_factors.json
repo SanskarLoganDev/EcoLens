@@ -1,0 +1,80 @@
+{
+  "categories": {
+    "air_travel": {
+      "description": "Commercial airline flights",
+      "short_haul_per_mile_kg": 0.255,
+      "long_haul_per_mile_kg": 0.195,
+      "domestic_avg_kg": 800,
+      "international_avg_kg": 1600,
+      "notes": "Domestic <$300, International >$300. Averages based on typical routes."
+    },
+    "ground_transport": {
+      "description": "Cars, rideshares, taxis",
+      "car_per_mile_kg": 0.404,
+      "rideshare_per_mile_kg": 0.450,
+      "taxi_per_mile_kg": 0.450,
+      "bus_per_mile_kg": 0.089,
+      "train_per_mile_kg": 0.041,
+      "avg_cost_per_mile_usd": 2.00,
+      "notes": "Estimate miles from cost: $20 ride ≈ 10 miles"
+    },
+    "food_restaurant": {
+      "description": "Restaurants, cafes, fast food",
+      "avg_meal_kg": 2.5,
+      "fast_food_meal_kg": 3.0,
+      "avg_cost_per_meal_usd": 25.00,
+      "notes": "Higher emissions due to meat, food waste, delivery"
+    },
+    "groceries": {
+      "description": "Grocery stores, food shopping",
+      "per_dollar_kg": 0.10,
+      "notes": "Mixed basket: meat, dairy, produce. $100 groceries ≈ 10kg CO2"
+    },
+    "electricity": {
+      "description": "Utility bills, electricity",
+      "per_kwh_kg": 0.385,
+      "avg_kwh_per_dollar": 7.0,
+      "us_household_monthly_avg_kwh": 877,
+      "notes": "US grid average: 0.385 kg CO2 per kWh. $100 bill ≈ 700 kWh"
+    },
+    "natural_gas": {
+      "description": "Gas heating, utilities",
+      "per_therm_kg": 5.3,
+      "avg_therms_per_dollar": 5.0,
+      "notes": "Residential heating. $100 bill ≈ 50 therms"
+    },
+    "goods_electronics": {
+      "description": "Electronics, gadgets, tech",
+      "per_dollar_kg": 0.15,
+      "notes": "Manufacturing + shipping. $500 laptop ≈ 75kg CO2"
+    },
+    "goods_clothing": {
+      "description": "Clothing, fashion",
+      "per_dollar_kg": 0.20,
+      "notes": "Fast fashion especially carbon-intensive. $100 clothes ≈ 20kg CO2"
+    },
+    "goods_general": {
+      "description": "Other purchases",
+      "per_dollar_kg": 0.10,
+      "notes": "General merchandise, household items"
+    }
+  },
+  
+  "keyword_hints": {
+    "air_travel": ["flight", "airline", "delta", "united", "american airlines", "southwest", "jetblue", "alaska air"],
+    "ground_transport": ["uber", "lyft", "taxi", "gas", "shell", "chevron", "exxon", "bp", "citgo", "sunoco"],
+    "food_restaurant": ["restaurant", "cafe", "starbucks", "chipotle", "mcdonalds", "subway", "cheesecake"],
+    "groceries": ["whole foods", "safeway", "trader joe", "walmart", "kroger", "publix", "target"],
+    "electricity": ["pge", "pg&e", "electric", "utility", "power", "duke energy", "con edison"],
+    "goods_electronics": ["amazon", "best buy", "apple store", "electronics"],
+    "goods_clothing": ["nordstrom", "macy", "gap", "h&m", "zara", "nike"],
+    "goods_general": ["target", "walmart", "costco", "amazon"]
+  },
+  
+  "benchmarks": {
+    "us_average_annual_kg": 16000,
+    "global_average_annual_kg": 4000,
+    "paris_target_annual_kg": 2300,
+    "european_average_annual_kg": 6800
+  }
+}

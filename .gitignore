@@ -208,3 +208,6 @@ __marimo__/
 
 # README documents for developers reference
 docs/
+
+# Result files
+results/

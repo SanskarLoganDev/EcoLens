@@ -17,6 +17,18 @@ Used for:
 import os
 from typing import Dict, List, Optional
 from anthropic import Anthropic
+from dotenv import load_dotenv, find_dotenv
+
+# Load environment variables from .env file
+# find_dotenv() automatically searches up the directory tree for .env
+# This is the standard, professional way to handle .env files
+dotenv_path = find_dotenv()
+if dotenv_path:
+    load_dotenv(dotenv_path)
+    print(f"✅ Loaded .env from: {dotenv_path}")
+else:
+    # Fallback: try loading from current working directory
+    load_dotenv()  # This will silently fail if .env doesn't exist
 
 
 class ClaudeClient:
@@ -29,7 +41,7 @@ class ClaudeClient:
         cost = client.get_cost_estimate()
     """
     
-    # Claude Sonnet 4 pricing (as of December 2024)
+    # Claude Sonnet 4 pricing (as of December 2025)
     # These are per MILLION tokens
     INPUT_COST_PER_1M = 3.00   # $3 per million input tokens
     OUTPUT_COST_PER_1M = 15.00  # $15 per million output tokens

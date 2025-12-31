@@ -32,13 +32,16 @@ class EmissionCalculator:
         Groceries for $100 → ~10 kg CO2
     """
     
-    def __init__(self, factors_file: str = "emission_factors.json"):
+    def __init__(self, factors_file: str = None):
         """
         Initialize calculator with emission factors database.
-        
+
         Args:
-            factors_file: Path to JSON file with emission factors
+            factors_file: Path to JSON file with emission factors (default: emission_factors.json in same dir as this script)
         """
+        if factors_file is None:
+            # Default to emission_factors.json in the same directory as this script
+            factors_file = Path(__file__).parent / "emission_factors.json"
         self.factors = self._load_factors(factors_file)
         print(f"✅ Loaded emission factors for {len(self.factors)} categories")
     
@@ -297,7 +300,7 @@ class EmissionCalculator:
         annual_projection = (total_emissions_kg / period_days) * 365
         
         # Load benchmark values from emission factors
-        benchmarks_path = Path("emission_factors.json")
+        benchmarks_path = "src/services/carbon/emission_factors.json"
         with open(benchmarks_path, 'r') as f:
             data = json.load(f)
         benchmarks = data['benchmarks']

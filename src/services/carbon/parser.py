@@ -16,7 +16,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 
 class Transaction(BaseModel):
@@ -34,14 +34,14 @@ class Transaction(BaseModel):
     amount: float
     category: Optional[str] = None
     
-    @validator('amount')
+    @field_validator('amount')
     def amount_must_be_positive(cls, v):
         """Ensure transaction amounts are positive"""
         if v <= 0:
             raise ValueError('Amount must be positive')
         return v
     
-    @validator('description')
+    @field_validator('description')
     def description_not_empty(cls, v):
         """Ensure description is not empty"""
         if not v or not v.strip():
@@ -275,26 +275,62 @@ if __name__ == "__main__":
         python parser.py
     """
     import json
-    
+
     # Path to sample CSV (adjust as needed)
-    csv_path = "src\services\carbon\sample_transactions.csv"
+    csv_path = "src/services/carbon/sample_transactions.csv"
     
     # Create parser instance
     parser = TransactionParser()
     
     # Parse the CSV
     try:
+        print(f"\n📍 Step: Parsing CSV file: {csv_path}")
+        print(f"   Current directory: {Path.cwd()}")
+        print(f"   File exists: {Path(csv_path).exists()}")
+
         transactions = parser.parse_csv(csv_path)
-        
+
         # Print summary
         print("\n📊 Summary:")
         summary = parser.get_summary()
         print(json.dumps(summary, indent=2))
-        
+
         # Print first few transactions
         print("\n📝 First 3 transactions:")
         for t in transactions[:3]:
             print(f"  {t.date.strftime('%Y-%m-%d')} | {t.description[:30]:30} | ${t.amount:7.2f}")
-        
+
+        print("\n✅ Parser test complete!")
+
+    except FileNotFoundError as e:
+        print(f"\n❌ FileNotFoundError: {e}")
+        print(f"\n📍 Location: File lookup failed")
+        print(f"   File attempted: {csv_path}")
+        print(f"   Current directory: {Path.cwd()}")
+        print(f"   Absolute path: {Path(csv_path).absolute()}")
+        print("\nFull traceback:")
+        import traceback
+        traceback.print_exc()
+
+    except ValueError as e:
+        print(f"\n❌ ValueError: {e}")
+        print(f"\n�� Location: Data validation failed")
+        print("\nFull traceback:")
+        import traceback
+        traceback.print_exc()
+
+    except ImportError as e:
+        print(f"\n❌ ImportError: {e}")
+        print(f"\n📍 Location: Missing required module")
+        print("\nTip: Install dependencies with:")
+        print("  pip install pandas pydantic")
+        print("\nFull traceback:")
+        import traceback
+        traceback.print_exc()
+
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"\n❌ Unexpected error ({type(e).__name__}): {e}")
+        print(f"\n📍 Location: Error details below")
+        print("\nFull traceback:")
+        import traceback
+        traceback.print_exc()

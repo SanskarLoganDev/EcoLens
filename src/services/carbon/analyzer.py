@@ -316,7 +316,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         csv_file = sys.argv[1]
     else:
-        csv_file = "src\services\carbon\sample_transactions.csv"
+        csv_file = "src/services/carbon/sample_transactions.csv"
     
     print("\n" + "="*70)
     print("ECOLENS - CARBON FOOTPRINT ANALYZER")
@@ -324,34 +324,57 @@ if __name__ == "__main__":
     
     try:
         # Create analyzer
+        print("\n📍 Step: Initializing analyzer...")
         analyzer = CarbonAnalyzer()
-        
+
         # Run analysis
+        print(f"\n📍 Step: Running analysis on {csv_file}...")
         result = analyzer.analyze_file(csv_file)
-        
+
         # Print summary
         print("\n" + "="*70)
         print("SUMMARY")
         print("="*70)
         print(f"Total Emissions: {result['total_emissions_kg']} kg CO2e")
         print(f"Annual Projection: {result['benchmarks']['your_annual_projection_kg']:,} kg/year")
-        
+
         if result['coaching']:
             print(f"\nTop Recommendation:")
             top_rec = result['coaching']['recommendations'][0]
             print(f"  → {top_rec['action']}")
             print(f"  → Potential savings: {top_rec['potential_savings_kg']} kg/year")
-        
+
         print("\n✅ Analysis complete! Check the results file for full details.")
-        
-    except FileNotFoundError:
-        print(f"\n❌ Error: CSV file not found: {csv_file}")
-        print(f"Usage: python analyzer.py <path_to_csv>")
-        
+
+    except FileNotFoundError as e:
+        print(f"\n❌ FileNotFoundError: {e}")
+        print(f"\n📍 Location: File lookup failed")
+        print(f"   File attempted: {csv_file}")
+        print(f"   Current directory: {Path.cwd()}")
+        print(f"\nUsage: python analyzer.py <path_to_csv>")
+        print("\nFull traceback:")
+        import traceback
+        traceback.print_exc()
+
     except ValueError as e:
-        print(f"\n❌ Error: {e}")
-        
+        print(f"\n❌ ValueError: {e}")
+        print(f"\n📍 Location: Validation or initialization failed")
+        print("\nFull traceback:")
+        import traceback
+        traceback.print_exc()
+
+    except ImportError as e:
+        print(f"\n❌ ImportError: {e}")
+        print(f"\n📍 Location: Missing required module")
+        print("\nTip: Make sure all dependencies are installed:")
+        print("  pip install -r requirements.txt")
+        print("\nFull traceback:")
+        import traceback
+        traceback.print_exc()
+
     except Exception as e:
-        print(f"\n❌ Unexpected error: {e}")
+        print(f"\n❌ Unexpected error ({type(e).__name__}): {e}")
+        print(f"\n📍 Location: Error details below")
+        print("\nFull traceback:")
         import traceback
         traceback.print_exc()

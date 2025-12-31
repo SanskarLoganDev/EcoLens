@@ -133,7 +133,8 @@ GLOBAL CONTEXT:
 - Paris Agreement Target: 2,300 kg CO2/year (to limit warming to 1.5°C)
 
 YOUR TASK:
-Generate 5 specific, actionable recommendations to reduce emissions.
+Generate EXACTLY 5 specific, actionable recommendations to reduce emissions.
+You MUST provide all 5 recommendations in your response.
 
 REQUIREMENTS FOR EACH RECOMMENDATION:
 1. Focus on highest-impact categories first
@@ -170,7 +171,36 @@ REQUIRED JSON FORMAT:
   "realistic_annual_target_kg": achievable_annual_target_number
 }}
 
-Return ONLY the JSON object, nothing else."""
+EXAMPLE COMPLETE OUTPUT:
+{{
+  "recommendations": [
+    {{
+      "action": "Take train instead of flying for trips under 300 miles",
+      "category": "air_travel",
+      "potential_savings_kg": 1200,
+      "difficulty": "medium",
+      "timeline": "start next trip",
+      "explanation": "Trains emit 80% less CO2 than flights for short distances. For a 300-mile flight, switching to train saves ~400kg per trip."
+    }},
+    {{
+      "action": "Switch to renewable energy plan with your utility provider",
+      "category": "electricity",
+      "potential_savings_kg": 2000,
+      "difficulty": "easy",
+      "timeline": "1 week to switch",
+      "explanation": "Most utilities offer renewable energy plans at similar prices. This eliminates emissions from grid electricity immediately."
+    }}
+  ],
+  "overall_strategy": "Focus on high-impact changes first, starting with renewable energy and reducing air travel.",
+  "realistic_annual_target_kg": 35000
+}}
+
+CRITICAL OUTPUT REQUIREMENTS:
+- Return ONLY valid JSON
+- Do NOT wrap in markdown code blocks (no ```json or ```)
+- Do NOT include any explanatory text before or after the JSON
+- Your ENTIRE response must be parseable by json.loads()
+- The response must start with {{ and end with }}"""
     
     return prompt
 

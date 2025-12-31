@@ -2,3 +2,5 @@ anthropic
 pandas 
 pydantic 
 python-dotenv
+PyPDF2
+pdf2image

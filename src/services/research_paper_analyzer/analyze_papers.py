@@ -185,23 +185,29 @@ class PaperAnalyzer:
     def _save_results(self, result: Dict, original_file: str) -> str:
         """
         Save analysis results to JSON file.
-        
+
         Creates filename based on original PDF:
             research_paper.pdf → paper_analysis_research_paper_2025-01-30.json
+
+        Saves to: src/services/research_paper_analyzer/results/
         """
         # Create output filename
         original_name = Path(original_file).stem
         timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         output_name = f"paper_analysis_{original_name}_{timestamp}.json"
-        output_path = Path("results") / output_name
-        
+
+        # Save in results folder within the research_paper_analyzer directory
+        analyzer_dir = Path(__file__).parent  # src/services/research_paper_analyzer
+        results_dir = analyzer_dir / "results"
+        output_path = results_dir / output_name
+
         # Create results directory if needed
-        output_path.parent.mkdir(exist_ok=True)
-        
+        results_dir.mkdir(exist_ok=True)
+
         # Save as formatted JSON
         with open(output_path, 'w') as f:
             json.dump(result, f, indent=2)
-        
+
         return str(output_path)
     
     def _print_summary(self, result: Dict):

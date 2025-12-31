@@ -236,10 +236,25 @@ class PDFProcessor:
             return images
             
         except Exception as e:
-            print(f"   Warning: Could not extract images: {e}")
-            print(f"   Make sure pdf2image and poppler are installed")
-            print(f"   macOS: brew install poppler")
-            print(f"   Ubuntu: sudo apt install poppler-utils")
+            error_msg = str(e).lower()
+
+            # Specific error handling for poppler not installed
+            if 'poppler' in error_msg or 'page count' in error_msg:
+                print(f"   ❌ ERROR: Poppler is not installed or not in PATH!")
+                print(f"   \n   📍 This is required for extracting images from PDFs")
+                print(f"   \n   Windows Installation:")
+                print(f"      1. Download: https://github.com/oschwartz10612/poppler-windows/releases/")
+                print(f"      2. Extract to: C:\\Program Files\\poppler-XX.XX.X")
+                print(f"      3. Add to PATH: C:\\Program Files\\poppler-XX.XX.X\\Library\\bin")
+                print(f"      4. Restart terminal/IDE")
+                print(f"      5. Test with: pdftoppm -v")
+                print(f"   \n   macOS: brew install poppler")
+                print(f"   Ubuntu: sudo apt install poppler-utils")
+                print(f"   \n   ⚠️  Continuing with text-only analysis...")
+            else:
+                print(f"   ⚠️  Warning: Could not extract images: {e}")
+                print(f"   Make sure pdf2image and poppler are installed")
+
             return []
     
     def detect_figure_captions(self, page_texts: List[str]) -> Dict[int, List[str]]:

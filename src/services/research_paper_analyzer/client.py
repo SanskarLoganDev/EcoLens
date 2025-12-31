@@ -14,6 +14,18 @@ Used by: vision_analyzer.py, summarizer.py
 import os
 from typing import Dict, List, Optional
 from anthropic import Anthropic
+from dotenv import load_dotenv, find_dotenv
+
+# Load environment variables from .env file
+# find_dotenv() automatically searches up the directory tree for .env
+# This is the standard, professional way to handle .env files
+dotenv_path = find_dotenv()
+if dotenv_path:
+    load_dotenv(dotenv_path)
+    print(f"✅ Loaded .env from: {dotenv_path}")
+else:
+    # Fallback: try loading from current working directory
+    load_dotenv()  # This will silently fail if .env doesn't exist
 
 
 class ClaudeClient:

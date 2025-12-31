@@ -14,6 +14,7 @@ Depends on: papers_client.py, papers_prompts.py
 """
 
 import json
+import re
 from typing import Dict, List
 from client import ClaudeClient
 from prompts import (
@@ -21,6 +22,27 @@ from prompts import (
     full_synthesis_prompt,
     extract_metadata_prompt
 )
+
+
+def strip_markdown_json(text: str) -> str:
+    """
+    Strip markdown code blocks from JSON response.
+
+    Claude sometimes returns:
+    ```json
+    {... valid json ...}
+    ```
+
+    We need to extract just the JSON part.
+    """
+    # Remove markdown code blocks
+    text = re.sub(r'```json\s*', '', text)
+    text = re.sub(r'```\s*', '', text)
+
+    # Strip leading/trailing whitespace
+    text = text.strip()
+
+    return text
 
 
 class PaperSummarizer:
@@ -74,11 +96,18 @@ class PaperSummarizer:
                 messages=[{'role': 'user', 'content': prompt}],
                 temperature=0.3  # Low temp for factual extraction
             )
-            
-            metadata = json.loads(response['content'])
+
+            # Strip markdown if present
+            clean_content = strip_markdown_json(response['content'])
+
+            metadata = json.loads(clean_content)
             print(f"   ✓ Extracted: {metadata.get('title', 'Unknown')}")
             return metadata
-            
+
+        except json.JSONDecodeError as e:
+            print(f"   ⚠️  Could not parse metadata JSON: {e}")
+            print(f"   Response preview: {response['content'][:200]}...")
+            return {}
         except Exception as e:
             print(f"   ⚠️  Could not extract metadata: {e}")
             return {}
@@ -118,11 +147,21 @@ class PaperSummarizer:
                 messages=[{'role': 'user', 'content': prompt}],
                 temperature=0.5
             )
-            
-            summary = json.loads(response['content'])
+
+            # Strip markdown if present
+            clean_content = strip_markdown_json(response['content'])
+
+            summary = json.loads(clean_content)
             print(f"   ✓ Summary created")
             return summary
-            
+
+        except json.JSONDecodeError as e:
+            print(f"   ❌ Error parsing summary JSON: {e}")
+            print(f"   Response preview: {response['content'][:300]}...")
+            return {
+                'error': f'JSON parse error: {str(e)}',
+                'raw_response': response['content']
+            }
         except Exception as e:
             print(f"   ❌ Error creating summary: {e}")
             return {
@@ -172,15 +211,26 @@ class PaperSummarizer:
                     messages=[{'role': 'user', 'content': prompt}],
                     temperature=0.5
                 )
-                
-                summary = json.loads(response['content'])
+
+                # Strip markdown if present
+                clean_content = strip_markdown_json(response['content'])
+
+                summary = json.loads(clean_content)
                 section_summaries.append(summary)
-                
+
                 # Show progress
                 main_points = summary.get('main_points', [])
                 if main_points:
                     print(f"   ✓ Main point: {main_points[0][:60]}...")
-                
+
+            except json.JSONDecodeError as e:
+                print(f"   ❌ Error parsing section JSON: {e}")
+                print(f"   Response preview: {response['content'][:200]}...")
+                section_summaries.append({
+                    'section': f"Section {section_num}",
+                    'error': f'JSON parse error: {str(e)}',
+                    'raw_response': response['content'][:500]
+                })
             except Exception as e:
                 print(f"   ❌ Error analyzing section: {e}")
                 section_summaries.append({
@@ -216,18 +266,29 @@ class PaperSummarizer:
                 messages=[{'role': 'user', 'content': prompt}],
                 temperature=0.7  # Higher for synthesis
             )
-            
-            synthesis = json.loads(response['content'])
+
+            # Strip markdown if present
+            clean_content = strip_markdown_json(response['content'])
+
+            synthesis = json.loads(clean_content)
             print(f"   ✓ Synthesis complete")
-            
+
             # Show executive summary
             exec_summary = synthesis.get('executive_summary', '')
             if exec_summary:
                 print(f"\n📋 Executive Summary:")
                 print(f"   {exec_summary[:150]}...")
-            
+
             return synthesis
-            
+
+        except json.JSONDecodeError as e:
+            print(f"   ❌ Error parsing synthesis JSON: {e}")
+            print(f"   Response preview: {response['content'][:300]}...")
+            return {
+                'error': f'JSON parse error: {str(e)}',
+                'section_summaries': section_summaries,  # Fallback to sections
+                'raw_response': response['content'][:1000]
+            }
         except Exception as e:
             print(f"   ❌ Error synthesizing: {e}")
             return {

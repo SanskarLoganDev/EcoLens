@@ -15,7 +15,7 @@ from dotenv import load_dotenv, find_dotenv
 dotenv_path = find_dotenv()
 if dotenv_path:
     load_dotenv(dotenv_path)
-    print(f"✅ Loaded .env from: {dotenv_path}")
+    print(f"[OK] Loaded .env from: {dotenv_path}")
 else:
     # Fallback: try loading from current working directory
     load_dotenv()  # This will silently fail if .env doesn't exist
@@ -24,30 +24,46 @@ else:
 # API KEYS
 # ===================================
 
-# NASA Earth API Key
-# Get yours at: https://api.nasa.gov/ (free, instant)
-NASA_API_KEY = os.getenv('NASA_API_KEY', 'DEMO_KEY')
+# NASA GIBS does not require an API key - it's open access!
+# No API key needed for GIBS imagery
 
 # Claude API Key (reuse from other features)
 CLAUDE_API_KEY = os.getenv('CLAUDE_API_KEY')
 
 # ===================================
-# NASA EARTH API SETTINGS
+# NASA GIBS API SETTINGS
 # ===================================
 
-NASA_EARTH_API_BASE = "https://api.nasa.gov/planetary/earth"
-NASA_IMAGERY_ENDPOINT = f"{NASA_EARTH_API_BASE}/imagery"
-NASA_ASSETS_ENDPOINT = f"{NASA_EARTH_API_BASE}/assets"
+# GIBS WMTS (Web Map Tile Service) endpoint
+# Using Geographic projection (EPSG:4326)
+GIBS_WMTS_BASE = "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/wmts.cgi"
 
-# Image dimensions (in degrees)
-# 0.025 = ~2.5 km at equator
-# 0.10 = ~10 km at equator
-# 0.25 = ~25 km at equator
-DEFAULT_IMAGE_DIM = 0.10  # Good balance of detail and file size
+# GIBS WMS (Web Map Service) endpoint for single image requests
+GIBS_WMS_BASE = "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi"
 
-# Cloud cover threshold (0-100)
-# Images with >50% clouds will trigger a warning
-CLOUD_COVER_THRESHOLD = 50
+# Available imagery layers (products)
+# HLS (Harmonized Landsat Sentinel-2) - Best for land monitoring
+GIBS_LAYERS = {
+    'landsat': 'HLS_L30_Nadir_BRDF_Adjusted_Reflectance',  # Landsat 8/9
+    'sentinel': 'HLS_S30_Nadir_BRDF_Adjusted_Reflectance',  # Sentinel-2
+    'viirs_day': 'VIIRS_SNPP_CorrectedReflectance_TrueColor',  # VIIRS Day
+    'modis_terra': 'MODIS_Terra_CorrectedReflectance_TrueColor',  # MODIS Terra
+    'modis_aqua': 'MODIS_Aqua_CorrectedReflectance_TrueColor',  # MODIS Aqua
+}
+
+# Default layer for analysis
+# Note: VIIRS has daily coverage which ensures better data availability
+# Landsat/Sentinel have higher resolution but 5-16 day repeat cycles
+DEFAULT_LAYER = 'viirs_day'  # VIIRS - daily coverage, 375m resolution, reliable availability
+
+# Image size in pixels (GIBS supports various sizes)
+# Larger = better detail but bigger file size
+DEFAULT_IMAGE_WIDTH = 1024
+DEFAULT_IMAGE_HEIGHT = 1024
+
+# Bounding box size in degrees (for WMS requests)
+# Smaller = more detail, Larger = wider view
+DEFAULT_BBOX_SIZE = 0.1  # ~11km x 11km at equator
 
 # ===================================
 # PRE-DEFINED REGIONS FOR TESTING
@@ -62,9 +78,10 @@ REGIONS: Dict[str, Dict] = {
         "type": "deforestation",
         "description": "High deforestation area in Brazilian Amazon",
         "recommended_dates": {
-            "before": "2023-01-01",
-            "after": "2024-01-01"
-        }
+            "before": "2023-06-15",  # Mid-year dates more likely to have clear imagery
+            "after": "2024-06-15"
+        },
+        "recommended_layer": "viirs_day"  # VIIRS has daily coverage, better availability
     },
     
     # Amazon - Rondônia (heavy deforestation)
@@ -207,19 +224,22 @@ for directory in [DOWNLOADS_DIR, CACHE_DIR, RESULTS_DIR]:
 
 def validate_config():
     """Validate configuration on import"""
-    
+
     if not CLAUDE_API_KEY:
-        print("⚠️  Warning: CLAUDE_API_KEY not set in environment")
+        print("[WARNING] CLAUDE_API_KEY not set in environment")
         print("   Set it with: export CLAUDE_API_KEY='your_key_here'")
-    
-    if NASA_API_KEY == 'DEMO_KEY':
-        print("ℹ️  Using NASA DEMO_KEY (limited to 30 requests/hour)")
-        print("   Get a free API key at: https://api.nasa.gov/")
-    
+    else:
+        print(f"[OK] Claude API Key loaded: {CLAUDE_API_KEY[:10]}...")
+
+    # GIBS doesn't require API key - it's open access!
+    print("[OK] Using NASA GIBS API (no API key required)")
+    print(f"   WMS Endpoint: {GIBS_WMS_BASE}")
+    print(f"   Default Layer: {GIBS_LAYERS[DEFAULT_LAYER]}")
+
     # Check data directories
     if not DOWNLOADS_DIR.exists():
-        print(f"✓ Created downloads directory: {DOWNLOADS_DIR}")
-    
+        print(f"[OK] Created downloads directory: {DOWNLOADS_DIR}")
+
     return True
 
 # Run validation on import
@@ -276,22 +296,24 @@ if __name__ == "__main__":
     print("="*60)
     print("SATELLITE MONITOR CONFIGURATION")
     print("="*60)
-    
-    print(f"\n🔑 API Keys:")
-    print(f"   NASA API Key: {NASA_API_KEY[:20]}..." if len(NASA_API_KEY) > 20 else f"   NASA API Key: {NASA_API_KEY}")
+
+    print(f"\n🔑 API Configuration:")
+    print(f"   NASA GIBS API: No key required (open access)")
     print(f"   Claude API Key: {'Set ✓' if CLAUDE_API_KEY else 'Not set ✗'}")
-    
+
     print(f"\n📂 Data Directories:")
     print(f"   Downloads: {DOWNLOADS_DIR}")
     print(f"   Cache: {CACHE_DIR}")
     print(f"   Results: {RESULTS_DIR}")
-    
-    print(f"\n⚙️  Settings:")
-    print(f"   Image dimension: {DEFAULT_IMAGE_DIM}°")
-    print(f"   Cloud threshold: {CLOUD_COVER_THRESHOLD}%")
-    
+
+    print(f"\n⚙️  GIBS Settings:")
+    print(f"   WMS Endpoint: {GIBS_WMS_BASE}")
+    print(f"   Default Layer: {DEFAULT_LAYER}")
+    print(f"   Image Size: {DEFAULT_IMAGE_WIDTH}x{DEFAULT_IMAGE_HEIGHT} pixels")
+    print(f"   Bbox Size: {DEFAULT_BBOX_SIZE}°")
+
     list_available_regions()
-    
+
     print("="*60)
     print("✅ Configuration loaded successfully")
     print("="*60)

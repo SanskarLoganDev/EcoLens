@@ -20,7 +20,7 @@ try:
     from satellite_config import (
         CARBON_EMISSION_FACTORS,
         SEVERITY_THRESHOLDS,
-        DEFAULT_IMAGE_DIM
+        DEFAULT_BBOX_SIZE
     )
     from geo_utils import (
         calculate_area_km2,
@@ -62,7 +62,7 @@ class ChangeDetector:
     def analyze_changes(self,
                        vision_comparison: Dict,
                        lat: float,
-                       dim: float = DEFAULT_IMAGE_DIM,
+                       dim: float = DEFAULT_BBOX_SIZE,
                        analysis_type: str = "general") -> Dict:
         """
         Analyze and quantify changes from vision comparison.

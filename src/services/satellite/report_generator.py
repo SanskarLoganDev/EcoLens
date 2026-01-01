@@ -108,30 +108,30 @@ class ReportGenerator:
     
     def _generate_markdown(self, data: Dict, base_filename: str) -> Path:
         """Generate human-readable Markdown summary"""
-        
+
         filepath = RESULTS_DIR / f"{base_filename}_report.md"
-        
+
         # Build markdown content
         md = self._build_markdown_content(data)
-        
-        with open(filepath, 'w') as f:
+
+        with open(filepath, 'w', encoding='utf-8') as f:
             f.write(md)
-        
+
         return filepath
     
     def _generate_csv(self, data: Dict, base_filename: str) -> Path:
         """Generate CSV of key metrics"""
-        
+
         filepath = RESULTS_DIR / f"{base_filename}_metrics.csv"
-        
+
         # Extract key metrics
         metrics = self._extract_metrics_for_csv(data)
-        
-        with open(filepath, 'w', newline='') as f:
+
+        with open(filepath, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=metrics[0].keys())
             writer.writeheader()
             writer.writerows(metrics)
-        
+
         return filepath
     
     def _build_markdown_content(self, data: Dict) -> str:

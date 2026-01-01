@@ -1,17 +1,20 @@
 """
-Satellite Image Fetcher
-========================
-Download satellite images from NASA Earth Imagery API (EPIC).
+Satellite Image Fetcher - GIBS API
+===================================
+Download satellite images from NASA's Global Imagery Browse Services (GIBS).
+
+GIBS provides open-access satellite imagery without requiring API keys.
+Uses WMS (Web Map Service) for single image requests.
 
 Features:
 - Fetch images by coordinates and date
 - Download before/after image pairs
-- Check image quality (cloud cover)
+- Multiple satellite products (Landsat, Sentinel, MODIS, VIIRS)
 - Save images to disk
-- Metadata extraction
+- No API key required!
 
-Used by: analyze_satellite.py (main orchestrator)
-Depends on: config.py, geo_utils.py
+Used by: analyzer.py (main orchestrator)
+Depends on: satellite_config.py, geo_utils.py
 """
 
 import os
@@ -20,15 +23,18 @@ import base64
 import requests
 from typing import Dict, List, Optional
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
+from PIL import Image
+import io
 
 try:
     from satellite_config import (
-        NASA_API_KEY,
-        NASA_IMAGERY_ENDPOINT,
-        NASA_ASSETS_ENDPOINT,
-        DEFAULT_IMAGE_DIM,
-        CLOUD_COVER_THRESHOLD,
+        GIBS_WMS_BASE,
+        GIBS_LAYERS,
+        DEFAULT_LAYER,
+        DEFAULT_IMAGE_WIDTH,
+        DEFAULT_IMAGE_HEIGHT,
+        DEFAULT_BBOX_SIZE,
         DOWNLOADS_DIR,
         CACHE_DIR
     )
@@ -43,18 +49,21 @@ except ImportError:
 
 class SatelliteFetcher:
     """
-    Fetch satellite images from NASA Earth Imagery API.
-    
+    Fetch satellite images from NASA GIBS API.
+
+    GIBS provides global satellite imagery updated daily.
+    No API key required - it's open access!
+
     Usage:
         fetcher = SatelliteFetcher()
-        
+
         # Fetch single image
         image_data = fetcher.fetch_image(
             lat=-3.0,
             lon=-60.0,
             date="2024-01-01"
         )
-        
+
         # Fetch before/after pair
         pair = fetcher.fetch_image_pair(
             lat=-3.0,
@@ -63,172 +72,276 @@ class SatelliteFetcher:
             after_date="2025-01-01"
         )
     """
-    
-    def __init__(self, api_key: Optional[str] = None):
+
+    def __init__(self, layer: str = DEFAULT_LAYER):
         """
         Initialize satellite fetcher.
-        
+
         Args:
-            api_key: NASA API key (uses config default if not provided)
+            layer: Satellite product to use (landsat, sentinel, viirs_day, modis_terra, modis_aqua)
         """
-        self.api_key = api_key or NASA_API_KEY
-        
+        self.layer = layer
+        self.layer_name = GIBS_LAYERS.get(layer, GIBS_LAYERS[DEFAULT_LAYER])
+
         # Create download directories
         DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        
-        print(f"✅ Satellite Fetcher initialized")
-        if self.api_key == 'DEMO_KEY':
-            print(f"   ⚠️  Using DEMO_KEY (limited to 30 requests/hour)")
-        else:
-            print(f"   API Key: {self.api_key[:10]}...")
-    
+
+        print(f"[OK] Satellite Fetcher initialized (GIBS API)")
+        print(f"   Layer: {self.layer} ({self.layer_name})")
+        print(f"   No API key required - open access!")
+
+    def _check_image_has_content(self, image_content: bytes) -> bool:
+        """
+        Check if image has actual content (not blank/white).
+        Returns True if image has visible content, False if blank.
+        """
+        try:
+            img = Image.open(io.BytesIO(image_content))
+
+            # Convert to RGB if needed
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            # Get image statistics
+            extrema = img.getextrema()
+
+            # Check if image is mostly uniform (blank)
+            # extrema returns ((min_r, max_r), (min_g, max_g), (min_b, max_b))
+            total_range = 0
+            for channel_min, channel_max in extrema:
+                total_range += (channel_max - channel_min)
+
+            # If total range is very low, image is likely blank
+            # Threshold of 30 means very little variation across all channels
+            if total_range < 30:
+                return False
+
+            return True
+        except Exception as e:
+            print(f"   [WARNING] Could not verify image content: {e}")
+            return True  # Assume it's valid if we can't check
+
     def fetch_image(self,
                    lat: float,
                    lon: float,
                    date: str,
-                   dim: float = DEFAULT_IMAGE_DIM,
+                   width: int = DEFAULT_IMAGE_WIDTH,
+                   height: int = DEFAULT_IMAGE_HEIGHT,
+                   bbox_size: float = DEFAULT_BBOX_SIZE,
                    location_name: Optional[str] = None,
-                   check_cloud_cover: bool = True) -> Dict:
+                   retry_nearby_dates: bool = True,
+                   max_date_offset: int = 7) -> Dict:
         """
-        Fetch a single satellite image from NASA API.
-        
+        Fetch a single satellite image from GIBS WMS.
+
+        Automatically detects blank images and retries with nearby dates to find
+        valid imagery when the requested date has no data available.
+
         Args:
             lat: Latitude (-90 to 90)
             lon: Longitude (-180 to 180)
-            date: Date in YYYY-MM-DD format
-            dim: Image dimension in degrees (default: 0.10)
+            date: Date in YYYY-MM-DD format (will auto-search nearby dates if blank)
+            width: Image width in pixels
+            height: Image height in pixels
+            bbox_size: Bounding box size in degrees
             location_name: Optional name for the location
-            check_cloud_cover: Warn if image is cloudy
-        
+            retry_nearby_dates: If True, searches nearby dates when image is blank (default: True)
+            max_date_offset: Maximum days to search forward/backward (default: 7)
+
         Returns:
             {
-                'date': '2024-01-01',
+                'date': '2024-01-01',  # May differ from requested if nearby date was used
                 'location': {'lat': -3.0, 'lon': -60.0, 'name': '...'},
                 'image_url': 'https://...',
                 'image_path': '/path/to/saved/image.png',
                 'image_base64': 'base64_encoded_string',
-                'cloud_score': 0.15,
+                'layer': 'landsat',
                 'metadata': {...}
             }
-        
+
         Raises:
-            ValueError: If coordinates invalid or image not available
+            ValueError: If coordinates invalid or no valid imagery found within date range
         """
-        
+
         # Validate coordinates
         is_valid, error = validate_coordinates(lat, lon)
         if not is_valid:
             raise ValueError(f"Invalid coordinates: {error}")
-        
-        print(f"\n📡 Fetching satellite image...")
+
+        print(f"\n[FETCH] Fetching satellite image from GIBS...")
         print(f"   Location: {format_coordinates(lat, lon)}")
         print(f"   Date: {date}")
-        
-        # Build request parameters
+        print(f"   Layer: {self.layer}")
+
+        # Calculate bounding box
+        # GIBS WMS expects: minlon,minlat,maxlon,maxlat
+        half_bbox = bbox_size / 2
+        bbox = f"{lon - half_bbox},{lat - half_bbox},{lon + half_bbox},{lat + half_bbox}"
+
+        # Build WMS request parameters
         params = {
-            'lat': lat,
-            'lon': lon,
-            'date': date,
-            'dim': dim,
-            'cloud_score': True,
-            'api_key': self.api_key
+            'SERVICE': 'WMS',
+            'VERSION': '1.3.0',
+            'REQUEST': 'GetMap',
+            'LAYERS': self.layer_name,
+            'CRS': 'EPSG:4326',
+            'BBOX': bbox,
+            'WIDTH': width,
+            'HEIGHT': height,
+            'FORMAT': 'image/png',
+            'TIME': date,
         }
-        
+
         # Make API request
         try:
-            response = requests.get(NASA_IMAGERY_ENDPOINT, params=params, timeout=30)
+            print(f"   [WAIT] Requesting image from GIBS WMS...")
+            print(f"   URL: {GIBS_WMS_BASE}")
+
+            response = requests.get(GIBS_WMS_BASE, params=params, timeout=120)
             response.raise_for_status()
-            
+
+            # Check if response is an image
+            content_type = response.headers.get('Content-Type', '')
+            if 'image' not in content_type:
+                # GIBS returns XML error messages
+                error_text = response.text[:500]
+                print(f"   [ERROR] GIBS returned error instead of image")
+                print(f"   Response: {error_text}")
+                raise ValueError(f"GIBS API error: No imagery available for {date}")
+
+            image_content = response.content
+            print(f"   [OK] Image downloaded ({len(image_content)} bytes)")
+
+        except requests.exceptions.Timeout as e:
+            print(f"   [ERROR] GIBS API request timed out")
+            print(f"   [TIP] Try again or check internet connection")
+            raise ValueError(f"GIBS API timeout: {e}")
         except requests.exceptions.RequestException as e:
-            print(f"   ❌ NASA API request failed: {e}")
+            print(f"   [ERROR] GIBS API request failed: {e}")
             raise ValueError(f"Failed to fetch satellite image: {e}")
-        
-        # Parse response
+
+        # Verify it's a valid image
         try:
-            data = response.json()
-        except json.JSONDecodeError:
-            print(f"   ❌ Invalid JSON response from NASA API")
-            raise ValueError("NASA API returned invalid JSON")
-        
-        # Check for errors in response
-        if 'error' in data or 'msg' in data:
-            error_msg = data.get('msg') or data.get('error', 'Unknown error')
-            print(f"   ❌ NASA API error: {error_msg}")
-            raise ValueError(f"NASA API error: {error_msg}")
-        
-        # Extract data
-        image_url = data.get('url')
-        cloud_score = data.get('cloud_score', 0)
-        actual_date = data.get('date', date)
-        
-        if not image_url:
-            raise ValueError("NASA API did not return image URL")
-        
-        # Check cloud cover
-        if check_cloud_cover and cloud_score > CLOUD_COVER_THRESHOLD / 100:
-            print(f"   ⚠️  High cloud cover: {cloud_score*100:.1f}%")
-        else:
-            print(f"   ✓ Cloud cover: {cloud_score*100:.1f}%")
-        
-        # Download image
-        print(f"   📥 Downloading image...")
-        image_content = self._download_image(image_url)
-        
+            img = Image.open(io.BytesIO(image_content))
+            print(f"   [OK] Valid image: {img.size[0]}x{img.size[1]} pixels, {img.mode} mode")
+        except Exception as e:
+            print(f"   [ERROR] Invalid image data received")
+            raise ValueError(f"Invalid image from GIBS: {e}")
+
+        # Check if image has actual content (not blank)
+        has_content = self._check_image_has_content(image_content)
+
+        if not has_content and retry_nearby_dates:
+            print(f"   [WARNING] Image appears blank - searching for nearby dates with data...")
+
+            # Try nearby dates
+            from datetime import datetime as dt, timedelta
+
+            original_date = dt.fromisoformat(date)
+            tried_dates = [date]
+
+            for offset in range(1, max_date_offset + 1):
+                # Try both forward and backward
+                for delta in [offset, -offset]:
+                    new_date = original_date + timedelta(days=delta)
+                    new_date_str = new_date.strftime('%Y-%m-%d')
+
+                    if new_date_str in tried_dates:
+                        continue
+
+                    tried_dates.append(new_date_str)
+
+                    print(f"   [RETRY] Trying {new_date_str} (offset: {delta:+d} days)...")
+
+                    # Recursive call without retry to avoid infinite loop
+                    try:
+                        return self.fetch_image(
+                            lat=lat,
+                            lon=lon,
+                            date=new_date_str,
+                            width=width,
+                            height=height,
+                            bbox_size=bbox_size,
+                            location_name=location_name,
+                            retry_nearby_dates=False  # Don't retry again
+                        )
+                    except Exception as retry_error:
+                        print(f"   [SKIP] {new_date_str} also failed: {retry_error}")
+                        continue
+
+            # If we get here, all retries failed
+            print(f"   [ERROR] No valid imagery found within {max_date_offset} days of {date}")
+            raise ValueError(
+                f"No valid satellite imagery available for {date} or nearby dates. "
+                f"Try using --layer modis_terra or --layer viirs_day for daily coverage."
+            )
+
+        elif not has_content:
+            print(f"   [WARNING] Image appears blank but retry is disabled")
+            # Continue anyway - will be caught by vision analysis
+
         # Save to disk
         image_path = self._save_image(
             image_content,
             lat, lon, date,
             location_name
         )
-        
-        print(f"   ✓ Saved to: {image_path}")
-        
+
+        print(f"   [OK] Saved to: {image_path}")
+
         # Convert to base64 for Vision API
         image_base64 = base64.b64encode(image_content).decode('utf-8')
-        
+
         # Build result
         result = {
-            'date': actual_date,
+            'date': date,
             'location': {
                 'lat': lat,
                 'lon': lon,
                 'name': location_name or format_coordinates(lat, lon)
             },
-            'image_url': image_url,
+            'image_url': f"{GIBS_WMS_BASE}?{requests.compat.urlencode(params)}",
             'image_path': str(image_path),
             'image_base64': image_base64,
-            'cloud_score': cloud_score,
+            'layer': self.layer,
+            'layer_name': self.layer_name,
             'metadata': {
-                'dimension': dim,
-                'api_key_used': self.api_key[:10] + '...' if len(self.api_key) > 10 else self.api_key,
+                'width': width,
+                'height': height,
+                'bbox': bbox,
+                'bbox_size_degrees': bbox_size,
                 'fetch_time': datetime.now().isoformat()
             }
         }
-        
+
         # Save metadata
         self._save_metadata(result, image_path)
-        
+
         return result
-    
+
     def fetch_image_pair(self,
                         lat: float,
                         lon: float,
                         before_date: str,
                         after_date: str,
-                        dim: float = DEFAULT_IMAGE_DIM,
+                        width: int = DEFAULT_IMAGE_WIDTH,
+                        height: int = DEFAULT_IMAGE_HEIGHT,
+                        bbox_size: float = DEFAULT_BBOX_SIZE,
                         location_name: Optional[str] = None) -> Dict:
         """
         Fetch before and after satellite images.
-        
+
         Args:
             lat: Latitude
             lon: Longitude
             before_date: Before date (YYYY-MM-DD)
             after_date: After date (YYYY-MM-DD)
-            dim: Image dimension
+            width: Image width
+            height: Image height
+            bbox_size: Bounding box size
             location_name: Location name
-        
+
         Returns:
             {
                 'before': {...},  # Result from fetch_image()
@@ -236,29 +349,33 @@ class SatelliteFetcher:
                 'time_delta_days': 365
             }
         """
-        
-        print(f"\n🔄 Fetching image pair...")
-        
+
+        print(f"\n[PAIR] Fetching image pair from GIBS...")
+
         # Fetch before image
         print(f"\n--- BEFORE IMAGE ---")
         before = self.fetch_image(
             lat=lat,
             lon=lon,
             date=before_date,
-            dim=dim,
+            width=width,
+            height=height,
+            bbox_size=bbox_size,
             location_name=location_name
         )
-        
+
         # Fetch after image
         print(f"\n--- AFTER IMAGE ---")
         after = self.fetch_image(
             lat=lat,
             lon=lon,
             date=after_date,
-            dim=dim,
+            width=width,
+            height=height,
+            bbox_size=bbox_size,
             location_name=location_name
         )
-        
+
         # Calculate time difference
         try:
             date1 = datetime.fromisoformat(before_date)
@@ -266,80 +383,16 @@ class SatelliteFetcher:
             time_delta = abs((date2 - date1).days)
         except:
             time_delta = 0
-        
-        print(f"\n✓ Image pair fetched successfully")
+
+        print(f"\n[OK] Image pair fetched successfully from GIBS")
         print(f"  Time span: {time_delta} days")
-        
+
         return {
             'before': before,
             'after': after,
             'time_delta_days': time_delta
         }
-    
-    def check_available_dates(self,
-                             lat: float,
-                             lon: float,
-                             begin_date: str,
-                             end_date: Optional[str] = None) -> List[Dict]:
-        """
-        Check which dates have available imagery.
-        
-        Uses NASA Earth Assets API to get metadata.
-        
-        Args:
-            lat: Latitude
-            lon: Longitude
-            begin_date: Start date (YYYY-MM-DD)
-            end_date: End date (YYYY-MM-DD), defaults to today
-        
-        Returns:
-            List of available dates with metadata
-        """
-        
-        if not end_date:
-            end_date = datetime.now().strftime('%Y-%m-%d')
-        
-        print(f"\n🔍 Checking available dates...")
-        print(f"   Location: {format_coordinates(lat, lon)}")
-        print(f"   Range: {begin_date} to {end_date}")
-        
-        params = {
-            'lat': lat,
-            'lon': lon,
-            'begin': begin_date,
-            'end': end_date,
-            'api_key': self.api_key
-        }
-        
-        try:
-            response = requests.get(NASA_ASSETS_ENDPOINT, params=params, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-            
-            results = data.get('results', [])
-            
-            print(f"   ✓ Found {len(results)} available dates")
-            
-            # Sort by cloud score (best first)
-            results.sort(key=lambda x: x.get('cloud_score', 1.0))
-            
-            return results
-            
-        except Exception as e:
-            print(f"   ⚠️  Could not check dates: {e}")
-            return []
-    
-    def _download_image(self, url: str) -> bytes:
-        """Download image from URL"""
-        
-        try:
-            response = requests.get(url, timeout=60)
-            response.raise_for_status()
-            return response.content
-            
-        except requests.exceptions.RequestException as e:
-            raise ValueError(f"Failed to download image from {url}: {e}")
-    
+
     def _save_image(self,
                    image_content: bytes,
                    lat: float,
@@ -347,7 +400,7 @@ class SatelliteFetcher:
                    date: str,
                    location_name: Optional[str]) -> Path:
         """Save image to disk"""
-        
+
         # Create location-specific directory
         if location_name:
             # Clean location name for filesystem
@@ -356,27 +409,27 @@ class SatelliteFetcher:
             location_dir = DOWNLOADS_DIR / clean_name
         else:
             location_dir = DOWNLOADS_DIR / f"lat{lat}_lon{lon}"
-        
+
         location_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Create filename
-        filename = f"{date}.png"
+        filename = f"{date}_{self.layer}.png"
         image_path = location_dir / filename
-        
+
         # Save
         with open(image_path, 'wb') as f:
             f.write(image_content)
-        
+
         return image_path
-    
+
     def _save_metadata(self, result: Dict, image_path: Path):
         """Save metadata JSON alongside image"""
-        
+
         metadata_path = image_path.with_suffix('.json')
-        
+
         # Exclude base64 data from metadata (too large)
         metadata = {k: v for k, v in result.items() if k != 'image_base64'}
-        
+
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=2)
 
@@ -384,71 +437,47 @@ class SatelliteFetcher:
 # Example usage / testing
 if __name__ == "__main__":
     """
-    Test satellite fetcher.
-    
+    Test satellite fetcher with GIBS API.
+
     Usage:
         python satellite_fetcher.py
     """
-    
+
     import sys
-    
+
     print("="*70)
-    print("SATELLITE FETCHER TEST")
+    print("SATELLITE FETCHER TEST (GIBS API)")
     print("="*70)
-    
-    # Check API key
-    if NASA_API_KEY == 'DEMO_KEY':
-        print("\n⚠️  Using DEMO_KEY (limited to 30 requests/hour)")
-        print("Get a free API key at: https://api.nasa.gov/")
-        print("\nContinuing with DEMO_KEY for testing...")
-    
+
     try:
-        fetcher = SatelliteFetcher()
-        
+        # Initialize fetcher
+        fetcher = SatelliteFetcher(layer='landsat')
+
         # Test single image fetch
         print("\n" + "="*70)
         print("TEST 1: Fetch Single Image")
         print("="*70)
-        
+
         result = fetcher.fetch_image(
             lat=-3.4653,
             lon=-62.2159,
             date='2024-01-01',
             location_name='Amazon Basin Test'
         )
-        
-        print(f"\n✅ Image fetched successfully:")
+
+        print(f"\n[SUCCESS] Image fetched successfully:")
         print(f"   Location: {result['location']['name']}")
         print(f"   Date: {result['date']}")
-        print(f"   Cloud cover: {result['cloud_score']*100:.1f}%")
+        print(f"   Layer: {result['layer']}")
         print(f"   Saved to: {result['image_path']}")
         print(f"   Base64 length: {len(result['image_base64'])} chars")
-        
-        # Test available dates check
+
         print("\n" + "="*70)
-        print("TEST 2: Check Available Dates")
+        print("[SUCCESS] All tests passed!")
         print("="*70)
-        
-        dates = fetcher.check_available_dates(
-            lat=-3.4653,
-            lon=-62.2159,
-            begin_date='2024-01-01',
-            end_date='2024-01-31'
-        )
-        
-        if dates:
-            print(f"\nTop 5 clearest dates in January 2024:")
-            for i, d in enumerate(dates[:5], 1):
-                date_str = d.get('date', 'unknown')
-                cloud = d.get('cloud_score', 0) * 100
-                print(f"   {i}. {date_str} - Cloud cover: {cloud:.1f}%")
-        
-        print("\n" + "="*70)
-        print("✅ All tests passed!")
-        print("="*70)
-        
+
     except Exception as e:
-        print(f"\n❌ Test failed: {e}")
+        print(f"\n[FAILED] Test failed: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

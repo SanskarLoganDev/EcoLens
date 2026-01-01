@@ -314,13 +314,13 @@ class SatelliteAnalyzer:
                     'date': image_pair['before']['date'],
                     'image_path': image_pair['before']['image_path'],
                     'image_url': image_pair['before']['image_url'],
-                    'cloud_score': image_pair['before']['cloud_score']
+                    'layer': image_pair['before']['layer']
                 },
                 'after': {
                     'date': image_pair['after']['date'],
                     'image_path': image_pair['after']['image_path'],
                     'image_url': image_pair['after']['image_url'],
-                    'cloud_score': image_pair['after']['cloud_score']
+                    'layer': image_pair['after']['layer']
                 }
             },
             'vision_analysis': vision_result,

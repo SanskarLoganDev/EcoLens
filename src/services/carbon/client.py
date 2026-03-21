@@ -41,7 +41,7 @@ class ClaudeClient:
         cost = client.get_cost_estimate()
     """
     
-    # Claude Sonnet 4 pricing (as of December 2025)
+    # Claude Sonnet 4 pricing (as of March 2026)
     # These are per MILLION tokens
     INPUT_COST_PER_1M = 3.00   # $3 per million input tokens
     OUTPUT_COST_PER_1M = 15.00  # $15 per million output tokens

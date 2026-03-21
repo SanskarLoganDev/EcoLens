@@ -314,7 +314,7 @@ if __name__ == "__main__":
 
     except ValueError as e:
         print(f"\n❌ ValueError: {e}")
-        print(f"\n�� Location: Data validation failed")
+        print(f"\n Location: Data validation failed")
         print("\nFull traceback:")
         import traceback
         traceback.print_exc()

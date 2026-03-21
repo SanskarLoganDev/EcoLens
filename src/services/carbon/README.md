@@ -2,134 +2,162 @@
 
 An AI-powered carbon footprint analysis tool that categorizes financial transactions and provides personalized recommendations for reducing carbon emissions.
 
+It can be run in two ways:
+- **CLI** — run `analyzer.py` directly from the terminal for a pure Python pipeline
+- **Web UI** — start the FastAPI backend and open `ui/carbon/index.html` in a browser for a full interactive interface
+
+---
+
 ## Overview
 
-This tool analyzes your spending patterns from CSV transaction files, calculates associated carbon emissions, and provides actionable recommendations using Claude AI to help you reduce your environmental impact.
+The tool analyzes spending patterns from CSV transaction files, calculates associated carbon emissions, and provides actionable coaching recommendations using Claude AI.
 
 ### Key Features
 
-- 📊 **Transaction Categorization**: Automatically categorizes transactions using Claude AI
-- 🌍 **Emission Calculation**: Calculates CO2 emissions for each spending category
-- 📈 **Benchmarking**: Compares your footprint against US/global averages and Paris Agreement targets
-- 💡 **AI Coaching**: Generates personalized recommendations for reducing emissions
-- 📁 **Detailed Reports**: Exports comprehensive JSON analysis reports
+- 📊 **Transaction Categorization** — Claude AI reads merchant names and assigns each transaction to one of 9 emission categories
+- 🌍 **Emission Calculation** — deterministic math engine applies CO2 factors per category (no AI involved)
+- 📈 **Benchmarking** — compares your annual projection against US average, global average, and the Paris Agreement target
+- 💡 **AI Coaching** — Claude generates 5 personalized, actionable recommendations with kg savings estimates and difficulty ratings
+- 🌐 **Web UI** — browser-based interface connected to a FastAPI backend
+- 📁 **Saved Reports** — every analysis is auto-saved as a timestamped JSON file
+
+---
 
 ## Project Structure
 
 ```
-carbon/
-├── README.md                      # This file
-├── analyzer.py                    # Main orchestrator - runs the complete pipeline
-├── parser.py                      # CSV transaction parser with validation
-├── calculator.py                  # Emission calculation engine
-├── client.py                      # Claude API client wrapper
-├── prompts.py                     # AI prompt templates
-├── emission_factors.json          # CO2 emission factors database
-├── samples/                       # Sample transaction CSV files
-│   ├── sample_transactions.csv
-│   └── sample_transactions_5.csv
-└── results/                       # Generated analysis reports (auto-created)
-    └── carbon_analysis_*.json
+EcoLens/
+│
+├── src/
+│   ├── api/
+│   │   └── carbon_api.py              # FastAPI backend — 4 HTTP endpoints
+│   │
+│   └── services/carbon/
+│       ├── README.md                  # This file
+│       ├── analyzer.py                # Main orchestrator — runs the full pipeline
+│       ├── parser.py                  # CSV reader and validator (pandas + Pydantic)
+│       ├── calculator.py              # CO2 math engine (no AI)
+│       ├── client.py                  # Claude API wrapper with cost tracking
+│       ├── prompts.py                 # Prompt templates for categorization and coaching
+│       ├── emission_factors.json      # CO2 factors database and global benchmarks
+│       ├── samples/
+│       │   └── sample_transactions_5.csv   # 28-transaction sample (May 2025)
+│       └── results/                   # Auto-created; stores timestamped JSON reports
+│           └── carbon_analysis_*.json
+│
+├── ui/
+│   └── carbon/
+│       └── index.html                 # Browser UI — connects to carbon_api.py
+│
+└── .vscode/
+    ├── launch.json                    # F5 run configs for API and individual modules
+    ├── tasks.json                     # Build tasks (start server, open UI, pip install)
+    └── settings.json                  # Python interpreter and path config
 ```
 
-### Module Breakdown
+### Module Responsibilities
 
-#### **analyzer.py** - Main Pipeline
-The orchestrator that ties everything together:
-1. Parses CSV transactions
-2. Categorizes with Claude AI
-3. Calculates emissions
-4. Generates benchmarks
-5. Provides AI coaching
-6. Saves results
+| File | Role | Uses AI? |
+|------|------|----------|
+| `carbon_api.py` | HTTP front door — receives CSV, calls analyzer, returns JSON | No |
+| `analyzer.py` | Orchestrator — calls all other modules in order | No (coordinates) |
+| `parser.py` | Reads CSV, validates columns, builds Transaction objects | No |
+| `prompts.py` | Builds the exact text instructions sent to Claude | No |
+| `client.py` | Sends prompts to Claude API, tracks token costs | Yes (Claude) |
+| `calculator.py` | Applies emission formulas from JSON database | No |
+| `emission_factors.json` | Stores CO2 factors and global benchmarks | — |
 
-#### **parser.py** - Transaction Parser
-Reads and validates CSV files:
-- Supports multiple encodings (UTF-8, Latin-1, etc.)
-- Validates required columns (date, description, amount)
-- Cleans and normalizes data
-- Converts to structured Transaction objects
-
-#### **calculator.py** - Emission Calculator
-Calculates CO2 emissions:
-- Loads emission factors from JSON database
-- Applies category-specific calculations
-- Generates emission breakdowns
-- Provides global benchmarks
-
-#### **client.py** - Claude API Client
-Handles AI interactions:
-- Manages Claude API authentication
-- Tracks token usage and costs
-- Provides cost estimates
-- Handles API errors gracefully
-
-#### **prompts.py** - Prompt Templates
-Pre-written prompts for AI:
-- Transaction categorization prompt
-- Personalized coaching prompt
-- JSON output format specifications
-
-#### **emission_factors.json** - Emission Database
-Contains CO2 factors for categories:
-- Air travel, ground transport
-- Food (restaurants, groceries)
-- Utilities (electricity, natural gas)
-- Goods (electronics, clothing, general)
+---
 
 ## Setup
 
 ### Prerequisites
 
 - Python 3.8+
-- Anthropic API key (Claude)
+- Anthropic API key — get one from https://console.anthropic.com/
 
 ### Installation
 
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-   Required packages:
-   - `anthropic` - Claude API client
-   - `pandas` - CSV data processing
-   - `pydantic` - Data validation
-   - `python-dotenv` - Environment variable management
-
-2. **Set up API key:**
-
-   Create a `.env` file in the project root:
-   ```bash
-   CLAUDE_API_KEY="your-api-key-here"
-   ```
-
-   Get your API key from: https://console.anthropic.com/
-
-## Usage
-
-### Basic Usage
-
-Run the analyzer with the sample data:
+**1. Install all dependencies** (from project root):
 
 ```bash
-# From project root
-python src/services/carbon/analyzer.py
+pip install -r requirements.txt
 ```
 
-This will analyze the default sample CSV file.
+Required packages:
+- `anthropic` — Claude API client
+- `pandas` — CSV data processing
+- `pydantic` — data validation
+- `python-dotenv` — reads the `.env` file
+- `fastapi` — web API framework
+- `uvicorn[standard]` — ASGI server that runs FastAPI
+- `python-multipart` — handles file uploads in FastAPI
 
-### Custom CSV File
+**2. Set up your API key:**
 
-Analyze your own transaction file:
+Create a `.env` file in the project root (not inside `src/`):
+
+```
+CLAUDE_API_KEY="your-api-key-here"
+```
+
+---
+
+## Running the Tool
+
+### Option A — Web UI (recommended)
+
+**Step 1:** Start the backend server from the project root:
 
 ```bash
+uvicorn src.api.carbon_api:app --reload --port 8000
+```
+
+Or in VS Code: press `F5` and pick **"🌿 Carbon API (uvicorn)"**.
+
+You should see:
+```
+INFO: Uvicorn running on http://127.0.0.1:8000
+INFO: Application startup complete.
+```
+
+**Step 2:** Open the UI. In VS Code terminal:
+
+```bash
+start ui\carbon\index.html
+```
+
+Or just double-click `ui/carbon/index.html` in Windows Explorer.
+
+**Step 3:** In the browser, click **"Load sample"** or upload your own CSV, then click **"Analyze with Claude AI"**.
+
+The green dot in the UI header confirms the backend is connected. If it shows red, the server is not running.
+
+**Step 4 (optional):** View the auto-generated API docs at:
+
+```
+http://localhost:8000/docs
+```
+
+This is a Swagger UI where you can test every endpoint directly without the browser UI.
+
+---
+
+### Option B — Command Line (no web server needed)
+
+```bash
+# From project root — uses the built-in sample CSV
+python src/services/carbon/analyzer.py
+
+# With your own CSV file
 python src/services/carbon/analyzer.py path/to/your/transactions.csv
 ```
 
+---
+
 ### CSV File Format
 
-Your CSV must have these columns:
+Your CSV must have exactly these three columns:
 
 ```csv
 date,description,amount
@@ -138,211 +166,269 @@ date,description,amount
 2025-01-17,Whole Foods,85.30
 ```
 
-**Required columns:**
-- `date` - Transaction date (flexible formats: YYYY-MM-DD, MM/DD/YYYY, etc.)
-- `description` - Merchant/transaction description
-- `amount` - Transaction amount in dollars (must be positive)
+| Column | Format | Notes |
+|--------|--------|-------|
+| `date` | YYYY-MM-DD or MM/DD/YYYY | Most formats accepted |
+| `description` | Text | Merchant name from your bank statement |
+| `amount` | Positive number | Dollar amount, no `$` sign needed |
 
-### Output
+---
 
-The analyzer generates a comprehensive JSON report in `src/services/carbon/results/`:
+## API Endpoints
+
+When the backend is running, these endpoints are available:
+
+| Method | URL | What it does |
+|--------|-----|--------------|
+| `GET` | `/api/health` | Confirms server is running |
+| `GET` | `/api/carbon/sample` | Returns the sample CSV as plain text |
+| `POST` | `/api/carbon/analyze` | Accepts a CSV upload, runs the full pipeline, returns JSON |
+| `GET` | `/api/carbon/results` | Lists all past saved result files |
+| `GET` | `/api/carbon/results/{id}` | Returns a specific past result by file stem ID |
+
+---
+
+## Analysis Pipeline (Step by Step)
+
+When you upload a CSV and click Analyze, this is what happens in order:
 
 ```
-carbon_analysis_sample_transactions_2025-12-31_14-30-45.json
+1. carbon_api.py     receives the CSV file upload
+2. carbon_api.py     writes it to a temp file on disk
+3. analyzer.py       is called with the temp file path
+4. parser.py         reads and validates every row → Transaction objects
+5. prompts.py        builds the categorization instruction text
+6. client.py         sends it to Claude → gets back JSON with categories
+7. calculator.py     applies emission formulas to each categorized transaction
+8. calculator.py     projects annual emissions and runs benchmark comparisons
+9. prompts.py        builds the coaching instruction text
+10. client.py        sends it to Claude → gets back 5 recommendations
+11. analyzer.py      merges all results into one dictionary
+12. analyzer.py      saves the result to results/carbon_analysis_*.json
+13. carbon_api.py    returns the result as JSON to the browser
+14. index.html       renders the charts, bars, and coaching cards
 ```
 
-**Report includes:**
-- Total emissions (kg CO2e)
-- Category breakdown with percentages
-- Individual transaction details
-- Benchmark comparisons (US average, Paris target)
-- 5 personalized recommendations
-- API cost summary
+---
 
-## Example Output
+## Output
+
+Every analysis generates a JSON report saved to `src/services/carbon/results/`:
 
 ```
-======================================================================
-ECOLENS - CARBON FOOTPRINT ANALYZER
-======================================================================
-
-🌱 Initializing Carbon Footprint Analyzer...
-======================================================================
-✅ Loaded .env from: E:\...\EcoLens\.env
-✅ Loaded emission factors for 9 categories
-✅ Claude API client initialized
-   Model: claude-sonnet-4-20250514
-   Max tokens: 4000
-======================================================================
-✅ All components ready!
-
-📄 STEP 1: Parsing transactions...
-----------------------------------------------------------------------
-   Transactions: 17
-   Date range: 2025-01-01 to 2025-01-31
-   Total spent: $1,856.30
-
-🤖 STEP 2: Categorizing transactions with Claude AI...
-----------------------------------------------------------------------
-   ✅ Categorized 17 transactions
-   📋 Category distribution:
-      air_travel           3 transactions
-      ground_transport     4 transactions
-      ...
-
-🧮 STEP 3: Calculating carbon emissions...
-----------------------------------------------------------------------
-   📊 Emission Breakdown:
-      air_travel          3200.00 kg ( 88.1%)
-      electricity          336.88 kg (  9.3%)
-      ground_transport      31.68 kg (  0.9%)
-      ...
-
-📊 STEP 4: Comparing to global benchmarks...
-----------------------------------------------------------------------
-   Your annual projection: 43,609 kg/year
-   vs US Average (16,000 kg): +173%
-   vs Paris Target (2,300 kg): +1,796%
-
-💡 STEP 5: Generating personalized recommendations...
-----------------------------------------------------------------------
-   Generated 5 recommendations:
-   1. Replace short domestic flights with train travel
-      Savings: 1600 kg/year | Difficulty: medium
-   2. Switch to renewable energy plan
-      Savings: 2000 kg/year | Difficulty: easy
-   ...
-
-✅ ANALYSIS COMPLETE!
-======================================================================
-
-💾 Results saved to: src/services/carbon/results/carbon_analysis_...json
-
-💰 API Cost Summary:
-   Total calls: 2
-   Total cost: $0.0316
+carbon_analysis_sample_transactions_5_2025-05-31_14-30-45.json
 ```
+
+The report contains:
+
+```json
+{
+  "total_emissions_kg": 1247.5,
+  "total_emissions_tons": 1.248,
+  "breakdown": {
+    "ground_transport": {
+      "emissions_kg": 590.2,
+      "percentage": 47.3,
+      "count": 10,
+      "total_spent": 596.75,
+      "items": [...]
+    }
+  },
+  "period_info": {
+    "start_date": "2025-05-01",
+    "end_date": "2025-05-31",
+    "days": 31,
+    "transaction_count": 28,
+    "total_spent": 1804.80
+  },
+  "benchmarks": {
+    "us_average_annual_kg": 16000,
+    "global_average_annual_kg": 4000,
+    "paris_target_annual_kg": 2300,
+    "your_annual_projection_kg": 14673,
+    "comparison": {
+      "vs_us_average": 91.7,
+      "vs_paris_target": 638.0
+    }
+  },
+  "coaching": {
+    "recommendations": [...],
+    "overall_strategy": "...",
+    "realistic_annual_target_kg": 9500
+  },
+  "api_cost": {
+    "total_calls": 2,
+    "total_input_tokens": 2841,
+    "total_output_tokens": 1203,
+    "input_cost_usd": 0.0085,
+    "output_cost_usd": 0.018,
+    "total_cost_usd": 0.0265
+  }
+}
+```
+
+---
 
 ## Emission Categories
 
-The analyzer recognizes these categories:
+The analyzer recognizes 9 categories:
 
-| Category | Examples | Emission Factor |
-|----------|----------|----------------|
-| **air_travel** | Delta, United, Southwest | ~4kg CO2/$ |
-| **ground_transport** | Uber, Lyft, Gas stations | ~0.225kg CO2/$ |
-| **food_restaurant** | Starbucks, Chipotle | ~0.3kg CO2/$ |
-| **groceries** | Whole Foods, Safeway | ~0.1kg CO2/$ |
-| **electricity** | PG&E, Duke Energy | ~2.7kg CO2/$ |
-| **natural_gas** | Gas utilities | ~5.3kg CO2/$ |
-| **goods_electronics** | Apple, Best Buy | ~0.4kg CO2/$ |
-| **goods_clothing** | Nordstrom, H&M | ~0.6kg CO2/$ |
-| **goods_general** | Target, Walmart | ~0.3kg CO2/$ |
+| Category | Examples | How CO2 is calculated |
+|----------|----------|----------------------|
+| `air_travel` | Delta, United, Southwest | $300+ = international (1,600 kg), under $300 = domestic (800 kg) |
+| `ground_transport` | Uber, Lyft, Shell, Chevron | Estimated miles from cost × 0.45 kg/mile |
+| `food_restaurant` | Starbucks, Chipotle, Outback | Estimated meals from cost × 2.5 kg/meal |
+| `groceries` | Whole Foods, Safeway, Costco | $1 = 0.10 kg CO2 |
+| `electricity` | PG&E, Duke Energy | Estimated kWh from bill × 0.385 kg/kWh |
+| `natural_gas` | SoCal Gas, National Gas | Estimated therms from bill × 5.3 kg/therm |
+| `goods_electronics` | Apple, Best Buy | $1 = 0.15 kg CO2 |
+| `goods_clothing` | Nordstrom, H&M, Gap | $1 = 0.20 kg CO2 |
+| `goods_general` | Target, Walmart | $1 = 0.10 kg CO2 |
+
+All factors are stored in `emission_factors.json` and can be edited to reflect your region or updated data.
+
+---
+
+## Cost Estimates
+
+API pricing for Claude Sonnet 4 (verified March 2026 — source: https://platform.claude.com/docs/en/about-claude/pricing):
+
+- **Input tokens:** $3.00 per million
+- **Output tokens:** $15.00 per million
+
+**Per full analysis (28 transactions):**
+
+| Step | Approximate cost |
+|------|-----------------|
+| Categorization (Call 1) | ~$0.01 |
+| Coaching (Call 2) | ~$0.02 |
+| **Total** | **~$0.03** |
+
+The exact cost for every run is printed in the terminal and included in the JSON report under `api_cost`.
+
+---
 
 ## Testing Individual Components
 
-### Test the Parser
+Each module can be run directly to test it in isolation:
 
 ```bash
+# Test CSV parsing only
 python src/services/carbon/parser.py
-```
 
-Tests CSV parsing with the default sample file.
-
-### Test the Calculator
-
-```bash
+# Test emission math only (no API needed)
 python src/services/carbon/calculator.py
-```
 
-Tests emission calculations with sample data.
-
-### Test the Claude Client
-
-```bash
+# Test Claude API connection (uses ~$0.001)
 python src/services/carbon/client.py
-```
 
-Tests Claude API connection (requires API key).
-
-### Test Prompt Templates
-
-```bash
+# Preview the prompts that get sent to Claude
 python src/services/carbon/prompts.py
 ```
 
-Shows generated prompts for categorization and coaching.
+---
+
+## VS Code Integration
+
+Three config files in `.vscode/` make development easier:
+
+**`launch.json`** — press `F5` and pick from:
+- `🌿 Carbon API (uvicorn)` — starts the web server with auto-reload
+- `🧪 Run: analyzer.py (sample data)` — runs the CLI pipeline
+- `🧪 Run: parser.py` — tests just the CSV parser
+- `🧪 Run: calculator.py` — tests just the emission calculator
+- `🧪 Run: client.py (API key test)` — tests the Claude connection
+
+**`tasks.json`** — from Terminal → Run Task:
+- `🌿 Start Carbon API` — starts uvicorn
+- `🌐 Open Carbon UI in browser` — opens `ui/carbon/index.html`
+- `📦 Install / upgrade requirements` — runs pip install
+- `📦 Install FastAPI + uvicorn` — installs web dependencies only
+
+---
 
 ## Configuration
 
 ### Emission Factors
 
-Edit `emission_factors.json` to customize emission factors for your region or update with latest data.
+Edit `emission_factors.json` to customize CO2 factors for your region or update with newer IPCC data. The structure is:
+
+```json
+{
+  "categories": {
+    "category_name": { "factor_name": value }
+  },
+  "benchmarks": {
+    "us_average_annual_kg": 16000,
+    "paris_target_annual_kg": 2300
+  }
+}
+```
 
 ### API Settings
 
-Modify in `client.py`:
-- `model` - Claude model to use (default: claude-sonnet-4)
-- `max_tokens` - Maximum response length (default: 4000)
-- Temperature settings in `analyzer.py`:
-  - Categorization: 0.3 (consistent)
-  - Coaching: 0.7 (creative)
+In `client.py`:
+- `self.model` — Claude model string (default: `claude-sonnet-4-20250514`)
+- `self.max_tokens` — max tokens Claude can generate per call (default: 4000)
+- `INPUT_COST_PER_1M` / `OUTPUT_COST_PER_1M` — pricing constants for cost tracking
 
-## Cost Estimates
+In `analyzer.py`:
+- Categorization temperature: `0.3` (low = consistent, deterministic)
+- Coaching temperature: `0.7` (higher = more creative suggestions)
 
-Typical API costs (Claude Sonnet 4):
-- Input: $3 per million tokens
-- Output: $15 per million tokens
-
-**Per analysis (17 transactions):**
-- Categorization: ~$0.01
-- Coaching: ~$0.02
-- **Total: ~$0.03** per analysis
+---
 
 ## Troubleshooting
 
-### "CSV file not found"
-- Ensure file path is correct
-- Use forward slashes in paths: `src/services/carbon/file.csv`
-- Check file exists with `ls` or `dir`
-
 ### "Claude API key not found"
-- Verify `.env` file exists in project root
-- Check no spaces around `=`: `CLAUDE_API_KEY="key"`
-- Ensure `python-dotenv` is installed
+- Confirm `.env` exists in the **project root** (`EcoLens/.env`), not inside `src/`
+- Check there are no spaces around `=`: `CLAUDE_API_KEY="key"` ✅ not `CLAUDE_API_KEY = "key"` ❌
+- Make sure `python-dotenv` is installed
 
-### "Empty recommendations list"
-- Check API key is valid
-- Review Claude API response in console
-- Check `results/*.json` for error messages
-- Verify internet connection
+### "CSV file not found"
+- Always run commands from the project root (`EcoLens/`), not from inside `src/`
+- Check the path with `dir` in the terminal to confirm the file exists
 
-### "Module not found"
-- Install dependencies: `pip install -r requirements.txt`
-- Activate virtual environment if using one
+### "Only .csv files are accepted" (API error)
+- The web UI only accepts `.csv` files — check your file extension
 
-## Benchmarks
+### "Module not found" (ImportError)
+- Run `pip install -r requirements.txt` from the project root with your virtual environment active
+- Confirm your VS Code interpreter is set to `.venv/Scripts/python.exe`
 
-**Global Context:**
-- **US Average**: 16,000 kg CO2/year per person
-- **Global Average**: 4,000 kg CO2/year per person
-- **Paris Agreement Target**: 2,300 kg CO2/year (to limit warming to 1.5°C)
+### "Application startup complete" but UI shows red dot
+- Open `http://localhost:8000/api/health` in the browser to confirm the server is actually responding
+- If it returns JSON, the server is fine — try refreshing the UI page
 
-## Contributing
+### "Analysis failed: 500" in the UI
+- Check the terminal where uvicorn is running for the full error traceback
+- Most common cause: invalid CSV format or Claude API key issue
 
-To add new emission categories:
+---
 
-1. Update `emission_factors.json` with new category and factor
-2. Add category to `prompts.py` categorization list
-3. Update this README with new category info
+## Benchmarks Reference
+
+| Benchmark | kg CO2 / year | Notes |
+|-----------|---------------|-------|
+| US Average | 16,000 | Highest in developed world |
+| European Average | 6,800 | |
+| Global Average | 4,000 | |
+| Paris Agreement Target | 2,300 | Required to limit warming to 1.5°C |
+
+---
+
+## Adding New Emission Categories
+
+To add a new category (e.g., `streaming_services`):
+
+1. Add it to `emission_factors.json` under `"categories"` with its CO2 factor
+2. Add it to the `AVAILABLE CATEGORIES` list in `prompts.py` so Claude knows to use it
+3. Add a calculation branch in `calculator.py` under `calculate_transaction()`
+4. Add it to the category label and color maps in `ui/carbon/index.html`
+5. Update the table in this README
+
+---
 
 ## License
 
-This project is part of the EcoLens carbon tracking platform.
-
-## Support
-
-For issues or questions, please check:
-- Error messages in console (detailed traceback provided)
-- `results/*.json` files for analysis details
-- API cost summary to track usage
+This project is part of the EcoLens AI Environmental Intelligence Platform.

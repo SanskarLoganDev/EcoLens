@@ -1,8 +1,13 @@
-anthropic 
-pandas 
-pydantic 
+anthropic
+pandas
+pydantic
 python-dotenv
 PyPDF2
 pdf2image
 requests
 Pillow
+
+# Web API layer (Carbon UI backend)
+fastapi
+uvicorn[standard]
+python-multipart

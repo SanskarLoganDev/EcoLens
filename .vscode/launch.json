@@ -1,0 +1,58 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🌿 Carbon API (uvicorn)",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "src.api.carbon_api:app",
+        "--reload",
+        "--port", "8000",
+        "--log-level", "info"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "🧪 Run: analyzer.py (sample data)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/services/carbon/analyzer.py",
+      "args": ["src/services/carbon/samples/sample_transactions_5.csv"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "🧪 Run: parser.py",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/services/carbon/parser.py",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "🧪 Run: calculator.py",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/services/carbon/calculator.py",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "🧪 Run: client.py (API key test)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/services/carbon/client.py",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    }
+  ]
+}

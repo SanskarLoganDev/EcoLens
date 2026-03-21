@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoLens — Carbon Footprint Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green:        #1a6b3c;
+    --green-mid:    #2d9e5f;
+    --green-light:  #e8f5ed;
+    --green-pale:   #f0faf4;
+    --amber:        #d97706;
+    --amber-light:  #fef3c7;
+    --red:          #dc2626;
+    --red-light:    #fee2e2;
+    --blue:         #1d4ed8;
+    --blue-light:   #dbeafe;
+    --gray-50:      #f9fafb;
+    --gray-100:     #f3f4f6;
+    --gray-200:     #e5e7eb;
+    --gray-400:     #9ca3af;
+    --gray-600:     #4b5563;
+    --gray-800:     #1f2937;
+    --gray-900:     #111827;
+    --radius:       12px;
+    --shadow:       0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
+    --shadow-lg:    0 4px 6px rgba(0,0,0,.07), 0 12px 40px rgba(0,0,0,.12);
+    --font-display: 'DM Serif Display', Georgia, serif;
+    --font-body:    'DM Sans', system-ui, sans-serif;
+    --api:          'http://localhost:8000';
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--gray-100);
+    color: var(--gray-800);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ─────────────────────────────────────── */
+  .app { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+
+  /* ── Header ─────────────────────────────────────── */
+  .header {
+    background: var(--green);
+    border-radius: var(--radius);
+    padding: 28px 32px 24px;
+    color: white;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-lg);
+  }
+  .header-row { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .logo { width: 40px; height: 40px; background: rgba(255,255,255,.18); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+  .header h1 { font-family: var(--font-display); font-size: 26px; font-weight: 400; }
+  .header p  { font-size: 13px; opacity: .75; margin-top: 2px; }
+  .api-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; opacity: .8; margin-top: 10px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; animation: pulse 2s infinite; }
+  .dot.offline { background: #f87171; animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── Steps bar ───────────────────────────────────── */
+  .steps { background: white; border-radius: var(--radius); padding: 0 4px; display: flex; margin-bottom: 20px; box-shadow: var(--shadow); overflow: hidden; }
+  .step-tab { flex: 1; padding: 14px 4px 12px; text-align: center; font-size: 13px; font-weight: 500; color: var(--gray-400); border-bottom: 2px solid transparent; transition: color .2s; display: flex; align-items: center; justify-content: center; gap: 7px; }
+  .step-tab.active { color: var(--green); border-bottom-color: var(--green); }
+  .step-tab.done   { color: var(--gray-600); }
+  .step-num { width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; background: var(--gray-200); color: var(--gray-600); flex-shrink: 0; }
+  .step-tab.active .step-num { background: var(--green); color: white; }
+  .step-tab.done   .step-num { background: var(--green-mid); color: white; }
+
+  /* ── Cards ───────────────────────────────────────── */
+  .card { background: white; border-radius: var(--radius); padding: 24px 26px; box-shadow: var(--shadow); margin-bottom: 16px; }
+  .card-title { font-family: var(--font-display); font-size: 17px; font-weight: 400; margin-bottom: 16px; color: var(--gray-900); }
+
+  /* ── Upload zone ─────────────────────────────────── */
+  .upload-zone {
+    border: 2px dashed var(--gray-200); border-radius: var(--radius);
+    padding: 44px 24px; text-align: center; background: var(--gray-50);
+    cursor: pointer; position: relative; transition: all .2s;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--green-mid); background: var(--green-pale); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 40px; margin-bottom: 14px; display: block; }
+  .upload-zone h3 { font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 6px; }
+  .upload-zone p  { font-size: 13px; color: var(--gray-400); }
+  .upload-zone strong { color: var(--gray-600); }
+
+  .divider { text-align: center; color: var(--gray-400); font-size: 12px; margin: 16px 0; position: relative; }
+  .divider::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--gray-200); }
+  .divider span { background: white; padding: 0 12px; position: relative; }
+
+  /* ── Buttons ─────────────────────────────────────── */
+  .btn { font-family: var(--font-body); cursor: pointer; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; transition: all .15s; display: inline-flex; align-items: center; gap: 8px; }
+  .btn-primary { background: var(--green); color: white; padding: 13px 24px; }
+  .btn-primary:hover:not(:disabled) { background: var(--green-mid); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,107,60,.3); }
+  .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-outline { background: white; color: var(--gray-600); border: 1px solid var(--gray-200); padding: 11px 18px; font-size: 13px; }
+  .btn-outline:hover { background: var(--gray-50); }
+  .btn-sample { width: 100%; justify-content: center; padding: 13px; background: white; border: 1px solid var(--gray-200); color: var(--green); border-radius: 10px; }
+  .btn-sample:hover { background: var(--green-pale); border-color: var(--green-mid); }
+
+  /* ── Preview table ───────────────────────────────── */
+  .preview-wrap { border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; margin-top: 20px; }
+  .preview-head { padding: 12px 16px; background: var(--green-pale); border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center; }
+  .preview-head h4 { font-size: 13px; font-weight: 600; color: var(--green); }
+  .preview-head span { font-size: 12px; color: var(--gray-400); }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 9px 14px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-400); border-bottom: 1px solid var(--gray-200); background: var(--gray-50); }
+  td { padding: 9px 14px; font-size: 13px; border-bottom: 1px solid var(--gray-100); }
+  tr:last-child td { border-bottom: none; }
+  .amount { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .action-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+  .action-bar span { font-size: 13px; color: var(--gray-400); }
+
+  /* ── Loading ─────────────────────────────────────── */
+  .spinner { width: 44px; height: 44px; border: 3px solid var(--gray-200); border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 20px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-card { text-align: center; }
+  .loading-card h3 { font-family: var(--font-display); font-size: 22px; font-weight: 400; margin-bottom: 8px; }
+  .loading-card p  { font-size: 13px; color: var(--gray-400); margin-bottom: 20px; }
+  .log { text-align: left; max-height: 180px; overflow-y: auto; background: var(--gray-50); border-radius: 8px; padding: 12px 14px; }
+  .log-line { font-size: 12px; font-family: 'Courier New', monospace; color: var(--gray-600); padding: 1px 0; }
+  .log-line.ok   { color: var(--green); }
+  .log-line.info { color: var(--blue); }
+  .log-line.err  { color: var(--red); }
+
+  /* ── Results ─────────────────────────────────────── */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  .stat-card { background: white; border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); border-left: 4px solid var(--green); }
+  .stat-card.warn   { border-left-color: var(--amber); }
+  .stat-card.danger { border-left-color: var(--red); }
+  .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-400); margin-bottom: 6px; }
+  .stat-value { font-family: var(--font-display); font-size: 30px; line-height: 1.1; color: var(--gray-900); }
+  .stat-unit  { font-size: 15px; color: var(--gray-400); }
+  .stat-sub   { font-size: 12px; color: var(--gray-400); margin-top: 4px; }
+
+  /* Benchmark */
+  .bench-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .bench-item { text-align: center; padding: 16px 8px; border-radius: 10px; background: var(--gray-50); }
+  .bench-item.you { background: var(--green-light); }
+  .bench-label { font-size: 11px; color: var(--gray-400); margin-bottom: 4px; }
+  .bench-val   { font-family: var(--font-display); font-size: 22px; }
+  .bench-sub   { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+  .vs-badge    { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 20px; margin-top: 6px; }
+  .vs-over     { background: var(--red-light); color: var(--red); }
+  .vs-under    { background: var(--green-light); color: var(--green); }
+
+  /* Category bars */
+  .cat-row    { margin-bottom: 14px; }
+  .cat-hdr    { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .cat-name   { font-size: 13px; font-weight: 500; }
+  .cat-nums   { font-size: 13px; color: var(--gray-600); }
+  .bar-bg     { height: 8px; background: var(--gray-100); border-radius: 4px; overflow: hidden; }
+  .bar-fill   { height: 100%; border-radius: 4px; transition: width 1.1s cubic-bezier(.4,0,.2,1); }
+  .cat-meta   { display: flex; gap: 14px; margin-top: 4px; }
+  .cat-meta span { font-size: 11px; color: var(--gray-400); }
+
+  /* Recommendation cards */
+  .rec-card   { background: white; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; border: 1px solid var(--gray-200); display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: start; }
+  .rec-rank   { width: 28px; height: 28px; border-radius: 50%; background: var(--green-light); color: var(--green); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+  .rec-action { font-size: 14px; font-weight: 500; margin-bottom: 5px; }
+  .rec-why    { font-size: 12px; color: var(--gray-600); line-height: 1.5; }
+  .rec-badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .badge      { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+  .badge-g    { background: var(--green-light); color: var(--green); }
+  .badge-a    { background: var(--amber-light); color: var(--amber); }
+  .badge-r    { background: var(--red-light); color: var(--red); }
+  .badge-b    { background: var(--blue-light); color: var(--blue); }
+  .savings    { font-family: var(--font-display); font-size: 18px; color: var(--green); text-align: right; white-space: nowrap; }
+  .savings-lbl{ font-size: 11px; color: var(--gray-400); text-align: right; }
+
+  /* Target box */
+  .target-box { background: var(--green-pale); border: 1px solid var(--green-light); border-radius: 10px; padding: 16px 18px; margin-top: 16px; }
+  .target-lbl { font-size: 12px; color: var(--gray-400); margin-bottom: 4px; }
+  .target-val { font-family: var(--font-display); font-size: 22px; color: var(--green); }
+  .target-sub { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
+
+  /* Error */
+  .error-card { background: var(--red-light); border: 1px solid #fca5a5; border-radius: var(--radius); padding: 16px 20px; margin-top: 16px; }
+  .error-card h4 { color: var(--red); font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .error-card p  { color: #991b1b; font-size: 13px; }
+
+  /* Bottom bar */
+  .bottom-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .cost-pill  { display: inline-flex; align-items: center; gap: 6px; background: var(--green-light); color: var(--green); font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px; }
+
+  /* Animations */
+  .fade-in { animation: fi .35s ease; }
+  @keyframes fi { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* History panel */
+  .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 8px; cursor: pointer; transition: background .15s; }
+  .history-item:hover { background: var(--gray-50); }
+  .history-name { font-size: 13px; font-weight: 500; }
+  .history-meta { font-size: 12px; color: var(--gray-400); }
+
+  /* Category color map */
+  .c-air       { background: #3b82f6; }
+  .c-ground    { background: #8b5cf6; }
+  .c-elec      { background: #f59e0b; }
+  .c-gas       { background: #ef4444; }
+  .c-rest      { background: #ec4899; }
+  .c-groc      { background: #10b981; }
+  .c-electr    { background: #6366f1; }
+  .c-cloth     { background: #f97316; }
+  .c-general   { background: #14b8a6; }
+  .c-other     { background: #9ca3af; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-row">
+      <div class="logo">🌿</div>
+      <h1>Carbon Footprint Analyzer</h1>
+    </div>
+    <p>Upload your bank transactions → Claude AI categorizes spending → calculates CO₂ → personalized coaching</p>
+    <div class="api-status">
+      <span class="dot" id="apiDot"></span>
+      <span id="apiStatusText">Checking API…</span>
+    </div>
+  </div>
+
+  <!-- Steps -->
+  <div class="steps">
+    <div class="step-tab active" id="tab1"><span class="step-num">1</span> Upload CSV</div>
+    <div class="step-tab"        id="tab2"><span class="step-num">2</span> Analyzing</div>
+    <div class="step-tab"        id="tab3"><span class="step-num">3</span> Results</div>
+  </div>
+
+  <!-- ── Step 1: Upload ── -->
+  <div id="step1">
+    <div class="card">
+      <div class="upload-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".csv">
+        <span class="upload-icon">📄</span>
+        <h3>Drop your transaction CSV here</h3>
+        <p>Required columns: <strong>date</strong>, <strong>description</strong>, <strong>amount</strong></p>
+      </div>
+
+      <div class="divider"><span>or use the built-in sample</span></div>
+
+      <button class="btn btn-sample" onclick="loadSample()">
+        📊 &nbsp;Load sample — 28 transactions (May 2025)
+      </button>
+
+      <div id="previewArea"></div>
+
+      <div class="action-bar" id="actionBar" style="display:none">
+        <span id="txSummary"></span>
+        <button class="btn btn-primary" id="analyzeBtn" onclick="startAnalysis()">
+          🤖 &nbsp;Analyze with Claude AI
+        </button>
+      </div>
+
+      <div id="uploadError"></div>
+    </div>
+
+    <!-- History -->
+    <div class="card" id="historyCard" style="display:none">
+      <div class="card-title">Past analyses</div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <!-- ── Step 2: Loading ── -->
+  <div id="step2" style="display:none">
+    <div class="card loading-card fade-in">
+      <div class="spinner"></div>
+      <h3>Analyzing your footprint…</h3>
+      <p>Claude AI is categorizing transactions and calculating emissions</p>
+      <div class="log" id="logLines"></div>
+    </div>
+  </div>
+
+  <!-- ── Step 3: Results ── -->
+  <div id="step3" style="display:none">
+    <div id="resultsArea"></div>
+    <div class="bottom-bar">
+      <div id="costPill"></div>
+      <button class="btn btn-outline" onclick="reset()">← Analyze another file</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+
+const CAT_LABELS = {
+  air_travel: 'Air Travel', ground_transport: 'Ground Transport',
+  food_restaurant: 'Restaurants', groceries: 'Groceries',
+  electricity: 'Electricity', natural_gas: 'Natural Gas',
+  goods_electronics: 'Electronics', goods_clothing: 'Clothing',
+  goods_general: 'General Goods', other: 'Other'
+};
+const CAT_COLORS = {
+  air_travel: 'c-air', ground_transport: 'c-ground',
+  electricity: 'c-elec', natural_gas: 'c-gas',
+  food_restaurant: 'c-rest', groceries: 'c-groc',
+  goods_electronics: 'c-electr', goods_clothing: 'c-cloth',
+  goods_general: 'c-general', other: 'c-other'
+};
+
+let selectedFile = null;
+
+// ── API health check ──────────────────────────────────────────
+async function checkApi() {
+  try {
+    const r = await fetch(`${API}/api/health`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      document.getElementById('apiDot').classList.remove('offline');
+      document.getElementById('apiStatusText').textContent = 'Backend connected — localhost:8000';
+      loadHistory();
+    } else throw new Error();
+  } catch {
+    document.getElementById('apiDot').classList.add('offline');
+    document.getElementById('apiStatusText').textContent = 'Backend offline — start with: uvicorn src.api.carbon_api:app --reload';
+  }
+}
+
+// ── File handling ─────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+  if (!file.name.endsWith('.csv')) {
+    showUploadError('Only .csv files are supported.');
+    return;
+  }
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => showPreview(ev.target.result, file.name);
+  reader.readAsText(file);
+}
+
+async function loadSample() {
+  try {
+    const r = await fetch(`${API}/api/carbon/sample`);
+    if (!r.ok) throw new Error('Could not fetch sample from API');
+    const text = await r.text();
+    // Turn CSV text into a File object so we can POST it normally
+    selectedFile = new File([text], 'sample_transactions_5.csv', { type: 'text/csv' });
+    showPreview(text, 'sample_transactions_5.csv');
+  } catch (err) {
+    showUploadError(`Sample load failed: ${err.message}`);
+  }
+}
+
+function showPreview(csvText, filename) {
+  const lines = csvText.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\r/g,''));
+  const rows = lines.slice(1).map(l => {
+    const vals = l.split(',');
+    const obj = {};
+    headers.forEach((h,i) => obj[h] = (vals[i]||'').trim().replace(/\r/g,'').replace(/^"|"$/g,''));
+    return obj;
+  }).filter(r => r.date && r.description && parseFloat(r.amount) > 0);
+
+  const total = rows.reduce((s,r) => s + parseFloat(r.amount), 0);
+  const preview = rows.slice(0,6);
+
+  document.getElementById('previewArea').innerHTML = `
+    <div class="preview-wrap fade-in">
+      <div class="preview-head">
+        <h4>📋 ${rows.length} transactions loaded — ${filename}</h4>
+        <span>Showing first ${Math.min(6, rows.length)}</span>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Description</th><th class="amount">Amount</th></tr></thead>
+        <tbody>
+          ${preview.map(r => `<tr>
+            <td>${r.date}</td>
+            <td>${r.description}</td>
+            <td class="amount">$${parseFloat(r.amount).toFixed(2)}</td>
+          </tr>`).join('')}
+          ${rows.length > 6 ? `<tr><td colspan="3" style="text-align:center;color:var(--gray-400);font-size:12px;padding:10px">…and ${rows.length-6} more transactions</td></tr>` : ''}
+        </tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('txSummary').textContent = `${rows.length} transactions · $${total.toFixed(2)} total`;
+  document.getElementById('actionBar').style.display = 'flex';
+  document.getElementById('uploadError').innerHTML = '';
+}
+
+function showUploadError(msg) {
+  document.getElementById('uploadError').innerHTML = `
+    <div class="error-card fade-in">
+      <h4>⚠️ Error</h4><p>${msg}</p>
+    </div>`;
+}
+
+// ── Analysis ──────────────────────────────────────────────────
+async function startAnalysis() {
+  if (!selectedFile) return;
+  setStep(2);
+  clearLog();
+
+  log('📄 Uploading transactions to backend…', 'info');
+
+  try {
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    log('🤖 Step 1/5 — Claude AI categorizing transactions…', 'info');
+
+    const res = await fetch(`${API}/api/carbon/analyze`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+
+    log('✅ Categorization complete', 'ok');
+    log('🧮 Step 2/5 — Calculating emissions…', 'info');
+
+    const result = await res.json();
+
+    log('✅ Emissions calculated', 'ok');
+    log('📊 Step 3/5 — Benchmarking…', 'info');
+    log('💡 Step 4/5 — Generating coaching recommendations…', 'info');
+    log('✅ ' + (result.coaching?.recommendations?.length || 0) + ' recommendations ready', 'ok');
+    log('💾 Step 5/5 — Results saved to results/ folder', 'ok');
+
+    renderResults(result);
+    setStep(3);
+    loadHistory();
+
+  } catch (err) {
+    log('❌ ' + err.message, 'err');
+    setTimeout(() => {
+      setStep(1);
+      showUploadError(`Analysis failed: ${err.message}<br><small>Is the backend running? Check the terminal.</small>`);
+    }, 1500);
+  }
+}
+
+// ── Result rendering ──────────────────────────────────────────
+function renderResults(r) {
+  const breakdown = r.breakdown || {};
+  const sorted = Object.entries(breakdown).sort((a,b) => b[1].emissions_kg - a[1].emissions_kg);
+  const maxKg = sorted[0]?.[1]?.emissions_kg || 1;
+
+  const ann = r.benchmarks?.your_annual_projection_kg || 0;
+  const vsUS    = Math.round((ann / 16000) * 100);
+  const vsParis = Math.round((ann / 2300)  * 100);
+
+  const vsBadge = (pct, label) => {
+    const diff = pct - 100;
+    const cls  = diff > 0 ? 'vs-over' : 'vs-under';
+    return `<span class="vs-badge ${cls}">${diff > 0 ? '+' : ''}${diff}% vs ${label}</span>`;
+  };
+
+  const diffBadge = d => ({ easy:'badge-g', medium:'badge-a', hard:'badge-r' })[d] || 'badge-a';
+
+  document.getElementById('resultsArea').innerHTML = `
+    <div class="fade-in">
+
+      <!-- Stats -->
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Monthly emissions</div>
+          <div class="stat-value">${(r.total_emissions_kg||0).toLocaleString()} <span class="stat-unit">kg CO₂e</span></div>
+          <div class="stat-sub">${r.period_info?.transaction_count||''} transactions · $${(r.period_info?.total_spent||0).toFixed(0)} spent</div>
+        </div>
+        <div class="stat-card warn">
+          <div class="stat-label">Annual projection</div>
+          <div class="stat-value">${ann.toLocaleString()} <span class="stat-unit">kg/yr</span></div>
+          <div class="stat-sub">Based on ${r.period_info?.days||30}-day period</div>
+        </div>
+      </div>
+
+      <!-- Benchmark -->
+      <div class="card">
+        <div class="card-title">How you compare</div>
+        <div class="bench-grid">
+          <div class="bench-item you">
+            <div class="bench-label">Your projection</div>
+            <div class="bench-val">${(ann/1000).toFixed(1)}t</div>
+            <div class="bench-sub">CO₂ per year</div>
+          </div>
+          <div class="bench-item">
+            <div class="bench-label">US Average</div>
+            <div class="bench-val">16t</div>
+            <div class="bench-sub">per person/year</div>
+            ${vsBadge(vsUS, 'US avg')}
+          </div>
+          <div class="bench-item">
+            <div class="bench-label">Paris Target</div>
+            <div class="bench-val">2.3t</div>
+            <div class="bench-sub">per person/year</div>
+            ${vsBadge(vsParis, 'target')}
+          </div>
+        </div>
+      </div>
+
+      <!-- Breakdown -->
+      <div class="card">
+        <div class="card-title">Emissions by category</div>
+        ${sorted.map(([cat, d]) => `
+          <div class="cat-row">
+            <div class="cat-hdr">
+              <span class="cat-name">${CAT_LABELS[cat]||cat}</span>
+              <span class="cat-nums">${(d.emissions_kg||0).toLocaleString()} kg · ${d.percentage||0}%</span>
+            </div>
+            <div class="bar-bg"><div class="bar-fill ${CAT_COLORS[cat]||'c-other'}" style="width:${Math.round(((d.emissions_kg||0)/maxKg)*100)}%"></div></div>
+            <div class="cat-meta">
+              <span>${d.count||0} transaction${(d.count||0)!==1?'s':''}</span>
+              <span>$${(d.total_spent||0).toFixed(0)} spent</span>
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <!-- Recommendations -->
+      <div class="card">
+        <div class="card-title">Personalized reduction plan</div>
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:18px">${r.coaching?.overall_strategy||''}</p>
+        ${(r.coaching?.recommendations||[]).map((rec, i) => `
+          <div class="rec-card">
+            <div class="rec-rank">${i+1}</div>
+            <div>
+              <div class="rec-action">${rec.action}</div>
+              <div class="rec-why">${rec.explanation}</div>
+              <div class="rec-badges">
+                <span class="badge ${diffBadge(rec.difficulty)}">${rec.difficulty}</span>
+                <span class="badge badge-b">${rec.timeline}</span>
+                <span class="badge badge-g">${CAT_LABELS[rec.category]||rec.category}</span>
+              </div>
+            </div>
+            <div>
+              <div class="savings">-${(rec.potential_savings_kg||0).toLocaleString()}</div>
+              <div class="savings-lbl">kg/year</div>
+            </div>
+          </div>`).join('')}
+        <div class="target-box">
+          <div class="target-lbl">Realistic annual target</div>
+          <div class="target-val">${(r.coaching?.realistic_annual_target_kg||0).toLocaleString()} kg/year</div>
+          <div class="target-sub">
+            a ${Math.round(100 - ((r.coaching?.realistic_annual_target_kg||ann) / (ann||1)) * 100)}% reduction from your current pace
+          </div>
+        </div>
+      </div>
+
+    </div>`;
+
+  const cost = r.api_cost || {};
+  document.getElementById('costPill').innerHTML =
+    `<span class="cost-pill">💰 $${(cost.total_cost_usd||0).toFixed(4)} API cost · ${cost.total_calls||2} Claude calls</span>`;
+}
+
+// ── History ───────────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const r = await fetch(`${API}/api/carbon/results`);
+    const data = await r.json();
+    const items = data.results || [];
+    if (!items.length) return;
+
+    const card = document.getElementById('historyCard');
+    const list = document.getElementById('historyList');
+    card.style.display = 'block';
+    list.innerHTML = items.slice(0, 8).map(item => `
+      <div class="history-item" onclick="loadHistoryItem('${item.id}')">
+        <div>
+          <div class="history-name">${item.filename.replace('carbon_analysis_','').replace('.json','')}</div>
+          <div class="history-meta">${item.size_kb} KB</div>
+        </div>
+        <span style="font-size:12px;color:var(--gray-400)">View →</span>
+      </div>`).join('');
+  } catch { /* backend offline */ }
+}
+
+async function loadHistoryItem(id) {
+  try {
+    const r = await fetch(`${API}/api/carbon/results/${id}`);
+    const data = await r.json();
+    renderResults(data);
+    setStep(3);
+  } catch (e) {
+    alert('Could not load result: ' + e.message);
+  }
+}
+
+// ── Utilities ─────────────────────────────────────────────────
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    document.getElementById(`step${i}`).style.display = i===n ? 'block' : 'none';
+    const t = document.getElementById(`tab${i}`);
+    t.className = 'step-tab' + (i<n?' done': i===n?' active':'');
+  });
+}
+
+function log(msg, type='info') {
+  const el = document.getElementById('logLines');
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  line.textContent = msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+function clearLog() { document.getElementById('logLines').innerHTML = ''; }
+
+function reset() {
+  selectedFile = null;
+  document.getElementById('previewArea').innerHTML = '';
+  document.getElementById('actionBar').style.display = 'none';
+  document.getElementById('uploadError').innerHTML = '';
+  document.getElementById('fileInput').value = '';
+  clearLog();
+  setStep(1);
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+checkApi();
+</script>
+</body>
+</html>

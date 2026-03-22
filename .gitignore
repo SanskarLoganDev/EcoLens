@@ -215,6 +215,9 @@ results/
 # research papers
 research_papers/
 
+# cache
+cache/
+
 .claude/
 
 # ── RAG vector database ───────────────────────────────────────────────────────

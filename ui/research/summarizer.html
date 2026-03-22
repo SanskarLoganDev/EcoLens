@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoLens — Paper Summarizer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green:       #1a6b3c;
+    --green-mid:   #2d9e5f;
+    --green-light: #e8f5ed;
+    --green-pale:  #f0faf4;
+    --amber:       #d97706;
+    --amber-light: #fef3c7;
+    --red:         #dc2626;
+    --red-light:   #fee2e2;
+    --blue:        #1d4ed8;
+    --blue-light:  #dbeafe;
+    --gray-50:     #f9fafb;
+    --gray-100:    #f3f4f6;
+    --gray-200:    #e5e7eb;
+    --gray-400:    #9ca3af;
+    --gray-600:    #4b5563;
+    --gray-800:    #1f2937;
+    --gray-900:    #111827;
+    --font-display: 'DM Serif Display', Georgia, serif;
+    --font-body:    'DM Sans', system-ui, sans-serif;
+    --radius:      12px;
+    --shadow:      0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
+  }
+
+  body { font-family: var(--font-body); background: var(--gray-100); color: var(--gray-800); font-size: 14px; }
+
+  /* ── Header ───────────────────────────────────────────────── */
+  .header {
+    background: var(--green); color: white;
+    padding: 16px 24px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .back-btn {
+    background: rgba(255,255,255,.15); border: none; color: white;
+    padding: 7px 12px; border-radius: 8px; font-family: var(--font-body);
+    font-size: 13px; cursor: pointer; transition: background .15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .back-btn:hover { background: rgba(255,255,255,.25); }
+  .header-title { flex: 1; }
+  .header-title h1 { font-family: var(--font-display); font-size: 20px; font-weight: 400; }
+  .header-title p  { font-size: 12px; opacity: .75; margin-top: 1px; }
+  .api-dot-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: .85; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 2s infinite; }
+  .dot.offline { background: #f87171; animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── Layout ───────────────────────────────────────────────── */
+  .layout { display: flex; min-height: calc(100vh - 58px); }
+
+  /* ── Left panel — run controls ────────────────────────────── */
+  .left-panel {
+    width: 320px; flex-shrink: 0;
+    background: white;
+    border-right: 1px solid var(--gray-200);
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  .panel-section { padding: 18px; border-bottom: 1px solid var(--gray-100); }
+  .panel-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-400); margin-bottom: 12px; }
+
+  /* PDF selector */
+  select {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid var(--gray-200); border-radius: 8px;
+    font-family: var(--font-body); font-size: 13px; color: var(--gray-800);
+    background: var(--gray-50); outline: none; cursor: pointer;
+    transition: border-color .15s;
+  }
+  select:focus { border-color: var(--green-mid); }
+
+  /* Options */
+  .option-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+  .option-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--green); cursor: pointer; }
+  .option-label { font-size: 13px; }
+  .option-note  { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+
+  /* Run button */
+  .run-btn {
+    width: 100%; padding: 13px;
+    background: var(--green); color: white; border: none; border-radius: 10px;
+    font-family: var(--font-body); font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .run-btn:hover:not(:disabled) { background: var(--green-mid); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,107,60,.3); }
+  .run-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* Status pill */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 500;
+    padding: 5px 12px; border-radius: 20px; margin-top: 12px;
+    width: 100%; justify-content: center;
+  }
+  .status-running  { background: var(--amber-light); color: var(--amber); }
+  .status-done     { background: var(--green-light);  color: var(--green); }
+  .status-error    { background: var(--red-light);    color: var(--red); }
+
+  /* Spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { display: inline-block; animation: spin .7s linear infinite; }
+
+  /* Past results list */
+  .result-item {
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    transition: background .15s; margin-bottom: 4px;
+    border: 1px solid transparent;
+  }
+  .result-item:hover   { background: var(--gray-50); border-color: var(--gray-200); }
+  .result-item.active  { background: var(--green-pale); border-color: var(--green-mid); }
+  .result-item-name    { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .result-item-meta    { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+
+  /* ── Right panel — results ────────────────────────────────── */
+  .right-panel { flex: 1; overflow-y: auto; padding: 28px 32px 64px; background: var(--gray-50); }
+
+  /* Empty / loading states */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center;
+    padding: 80px 40px; gap: 12px; color: var(--gray-400);
+  }
+  .empty-icon { font-size: 48px; }
+  .empty-state h2 { font-family: var(--font-display); font-size: 20px; font-weight: 400; color: var(--gray-600); }
+  .empty-state p  { font-size: 14px; max-width: 340px; line-height: 1.6; }
+
+  /* Result sections */
+  .result-header { margin-bottom: 24px; }
+  .result-title  { font-family: var(--font-display); font-size: 26px; font-weight: 400; color: var(--gray-900); margin-bottom: 6px; }
+  .result-meta   { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--gray-600); }
+  .result-meta span { display: flex; align-items: center; gap: 4px; }
+
+  .card {
+    background: white; border-radius: var(--radius);
+    padding: 20px 24px; box-shadow: var(--shadow); margin-bottom: 18px;
+  }
+  .card-title { font-family: var(--font-display); font-size: 17px; font-weight: 400; margin-bottom: 14px; color: var(--gray-900); }
+
+  /* Abstract */
+  .abstract-text { font-size: 14px; color: var(--gray-600); line-height: 1.7; }
+
+  /* Executive summary */
+  .exec-summary { font-size: 14px; line-height: 1.7; color: var(--gray-800); }
+
+  /* Findings list */
+  .finding-item { padding: 12px 0; border-bottom: 1px solid var(--gray-100); }
+  .finding-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .finding-text { font-size: 14px; font-weight: 500; margin-bottom: 5px; }
+  .finding-evidence { font-size: 12px; color: var(--gray-600); line-height: 1.5; }
+  .confidence-badge {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    padding: 2px 8px; border-radius: 20px; margin-left: 8px; vertical-align: middle;
+  }
+  .conf-very-high { background: #dcfce7; color: #16a34a; }
+  .conf-high      { background: var(--green-light); color: var(--green); }
+  .conf-medium    { background: var(--amber-light); color: var(--amber); }
+  .conf-low       { background: var(--red-light);   color: var(--red); }
+
+  /* Tag lists */
+  .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag-item {
+    background: var(--gray-100); color: var(--gray-600);
+    font-size: 12px; padding: 4px 10px; border-radius: 20px;
+  }
+  .tag-item.green { background: var(--green-light); color: var(--green); }
+
+  /* Metrics row */
+  .metrics-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .metric-box  { background: var(--gray-50); border-radius: 8px; padding: 12px 14px; text-align: center; }
+  .metric-val  { font-family: var(--font-display); font-size: 20px; color: var(--gray-900); }
+  .metric-lbl  { font-size: 11px; color: var(--gray-400); margin-top: 3px; }
+
+  /* Cost pill at bottom */
+  .cost-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--green-light); color: var(--green);
+    font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px;
+    margin-top: 4px;
+  }
+
+  @keyframes fi { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  .fade-in { animation: fi .35s ease; }
+</style>
+</head>
+<body>
+
+<!-- Header with back nav -->
+<div class="header">
+  <button class="back-btn" onclick="location.href='index.html'">← Back</button>
+  <div class="header-title">
+    <h1>Paper Summarizer</h1>
+    <p>Deep analysis of individual research papers using Claude AI</p>
+  </div>
+  <div class="api-dot-wrap">
+    <span class="dot" id="apiDot"></span>
+    <span id="apiStatus">Connecting…</span>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- ── Left panel ── -->
+  <aside class="left-panel">
+
+    <!-- Run new analysis -->
+    <div class="panel-section">
+      <div class="panel-title">Run new analysis</div>
+
+      <select id="pdfSelect" onchange="onPdfSelect()">
+        <option value="">— Select a paper —</option>
+      </select>
+
+      <div class="option-row" style="margin-top:10px">
+        <input type="checkbox" id="analyzeImages">
+        <div>
+          <div class="option-label">Analyse charts &amp; figures</div>
+          <div class="option-note">Requires Poppler. Adds ~$0.03–$0.05.</div>
+        </div>
+      </div>
+
+      <button class="run-btn" id="runBtn" onclick="runAnalysis()" disabled>
+        🤖 Run Analysis
+      </button>
+
+      <div id="jobStatus" style="display:none"></div>
+    </div>
+
+    <!-- Past results -->
+    <div class="panel-section">
+      <div class="panel-title">Past results</div>
+      <div id="resultsList">
+        <div style="font-size:13px;color:var(--gray-400)">Loading…</div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── Right panel ── -->
+  <main class="right-panel" id="rightPanel">
+    <div class="empty-state">
+      <div class="empty-icon">📄</div>
+      <h2>No result selected</h2>
+      <p>Select a paper on the left and click <strong>Run Analysis</strong>, or click a past result to view it.</p>
+    </div>
+  </main>
+
+</div>
+
+<script>
+const API = 'http://localhost:8001';
+let pollInterval = null;
+let activeResultId = null;
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const r = await fetch(`${API}/api/rag/health`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      document.getElementById('apiDot').classList.remove('offline');
+      document.getElementById('apiStatus').textContent = 'Connected — Research API :8001';
+      await loadSidebar();
+    } else throw new Error();
+  } catch {
+    document.getElementById('apiDot').classList.add('offline');
+    document.getElementById('apiStatus').textContent = 'API offline — start: uvicorn src.api.rag_api:app --port 8001';
+  }
+}
+
+async function loadSidebar() {
+  await Promise.all([loadPdfDropdown(), loadResultsList()]);
+}
+
+// ── PDF dropdown ───────────────────────────────────────────────────────────
+async function loadPdfDropdown() {
+  try {
+    const r    = await fetch(`${API}/api/summarizer/available`);
+    const data = await r.json();
+    const sel  = document.getElementById('pdfSelect');
+
+    sel.innerHTML = '<option value="">— Select a paper —</option>';
+    (data.papers || []).forEach(p => {
+      const opt    = document.createElement('option');
+      opt.value    = p.filename;
+      opt.textContent = p.filename.replace('.pdf','') +
+        (p.has_summary ? ' ✓' : '') +
+        (p.job_status === 'running' ? ' ⏳' : '');
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    console.error('loadPdfDropdown failed:', e);
+  }
+}
+
+function onPdfSelect() {
+  const val = document.getElementById('pdfSelect').value;
+  document.getElementById('runBtn').disabled = !val;
+}
+
+// ── Results list ───────────────────────────────────────────────────────────
+async function loadResultsList() {
+  try {
+    const r    = await fetch(`${API}/api/summarizer/results`);
+    const data = await r.json();
+    const list = document.getElementById('resultsList');
+    const results = data.results || [];
+
+    if (!results.length) {
+      list.innerHTML = '<div style="font-size:13px;color:var(--gray-400)">No analyses yet.</div>';
+      return;
+    }
+
+    list.innerHTML = results.map(res => `
+      <div class="result-item ${res.id === activeResultId ? 'active' : ''}"
+           id="ri-${res.id}"
+           onclick="loadResult('${res.id}')">
+        <div class="result-item-name">${res.title || res.pdf_name || res.filename}</div>
+        <div class="result-item-meta">
+          ${res.pages ? res.pages + ' pages · ' : ''}
+          ${res.total_cost ? '$' + res.total_cost.toFixed(4) : ''}
+        </div>
+      </div>`).join('');
+  } catch (e) {
+    document.getElementById('resultsList').innerHTML =
+      '<div style="font-size:13px;color:var(--gray-400)">Could not load results.</div>';
+  }
+}
+
+// ── Run analysis ───────────────────────────────────────────────────────────
+async function runAnalysis() {
+  const filename     = document.getElementById('pdfSelect').value;
+  const analyzeImgs  = document.getElementById('analyzeImages').checked;
+  if (!filename) return;
+
+  document.getElementById('runBtn').disabled = true;
+  showJobStatus('running', '⏳ Analysing… this takes 30–90 seconds');
+
+  try {
+    const r = await fetch(`${API}/api/summarizer/run`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ filename, analyze_images: analyzeImgs }),
+    });
+    const data = await r.json();
+
+    if (!r.ok) throw new Error(data.detail || 'Failed to start analysis');
+    if (data.status === 'already_running') {
+      showJobStatus('running', '⏳ Already running — please wait…');
+    }
+
+    // Poll every 4 seconds until job is done or errored
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(() => pollJobStatus(filename), 4000);
+
+  } catch (e) {
+    showJobStatus('error', '❌ ' + e.message);
+    document.getElementById('runBtn').disabled = false;
+  }
+}
+
+async function pollJobStatus(filename) {
+  try {
+    const r    = await fetch(`${API}/api/summarizer/available`);
+    const data = await r.json();
+    const paper = (data.papers || []).find(p => p.filename === filename);
+    if (!paper) return;
+
+    const status = paper.job_status;
+
+    if (status === 'done') {
+      clearInterval(pollInterval);
+      showJobStatus('done', '✅ Analysis complete!');
+      document.getElementById('runBtn').disabled = false;
+      await loadSidebar();
+      // Auto-load the newest result for this paper
+      const rRes = await fetch(`${API}/api/summarizer/results`);
+      const dRes = await rRes.json();
+      const pdfStem = filename.replace('.pdf','');
+      const match = (dRes.results || []).find(r => r.pdf_name === filename || (r.id || '').includes(pdfStem));
+      if (match) loadResult(match.id);
+
+    } else if (status && status.startsWith('error:')) {
+      clearInterval(pollInterval);
+      showJobStatus('error', '❌ ' + status.replace('error:', '').trim());
+      document.getElementById('runBtn').disabled = false;
+    }
+  } catch (e) {
+    // transient network error — keep polling
+  }
+}
+
+function showJobStatus(type, message) {
+  const el = document.getElementById('jobStatus');
+  el.style.display = 'block';
+  el.innerHTML = `<div class="status-pill status-${type}">${message}</div>`;
+}
+
+// ── Load and render a result ───────────────────────────────────────────────
+async function loadResult(resultId) {
+  activeResultId = resultId;
+
+  // Highlight in list
+  document.querySelectorAll('.result-item').forEach(el => el.classList.remove('active'));
+  const item = document.getElementById(`ri-${resultId}`);
+  if (item) item.classList.add('active');
+
+  const panel = document.getElementById('rightPanel');
+  panel.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><h2>Loading…</h2></div>';
+
+  try {
+    const r    = await fetch(`${API}/api/summarizer/results/${resultId}`);
+    if (!r.ok) throw new Error('Could not load result');
+    const data = await r.json();
+    renderResult(data);
+  } catch (e) {
+    panel.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div><h2>Error</h2><p>${e.message}</p></div>`;
+  }
+}
+
+function renderResult(d) {
+  const panel    = document.getElementById('rightPanel');
+  const fileInfo = d.file_info    || {};
+  const meta     = d.metadata     || {};
+  const synth    = d.text_analysis?.synthesis || {};
+  const visual   = d.visual_insights;
+  const cost     = d.api_cost     || {};
+
+  const authors  = (meta.authors || []).slice(0, 4).join(', ') +
+                   (meta.authors?.length > 4 ? ` +${meta.authors.length - 4} more` : '');
+
+  const confClass = c => ({
+    'very high': 'conf-very-high',
+    'high':      'conf-high',
+    'medium':    'conf-medium',
+    'low':       'conf-low',
+  })[c?.toLowerCase()] || 'conf-medium';
+
+  // ── Build HTML sections ──
+  let html = `<div class="fade-in">`;
+
+  // Header
+  html += `
+    <div class="result-header">
+      <div class="result-title">${escHtml(meta.title || fileInfo.filename || 'Unknown')}</div>
+      <div class="result-meta">
+        ${authors ? `<span>👤 ${escHtml(authors)}</span>` : ''}
+        ${meta.publication_date ? `<span>📅 ${escHtml(meta.publication_date)}</span>` : ''}
+        ${meta.publication_venue ? `<span>📰 ${escHtml(meta.publication_venue)}</span>` : ''}
+        ${fileInfo.pages ? `<span>📄 ${fileInfo.pages} pages</span>` : ''}
+      </div>
+    </div>`;
+
+  // Metrics row
+  html += `
+    <div class="card">
+      <div class="metrics-row">
+        <div class="metric-box">
+          <div class="metric-val">${fileInfo.pages || '—'}</div>
+          <div class="metric-lbl">Pages</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-val">${synth.methodology_quality || '—'}</div>
+          <div class="metric-lbl">Methodology</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-val">${synth.evidence_strength || '—'}</div>
+          <div class="metric-lbl">Evidence strength</div>
+        </div>
+      </div>
+    </div>`;
+
+  // Abstract
+  if (meta.abstract) {
+    html += `
+      <div class="card">
+        <div class="card-title">Abstract</div>
+        <div class="abstract-text">${escHtml(meta.abstract)}</div>
+      </div>`;
+  }
+
+  // Executive summary
+  if (synth.executive_summary) {
+    html += `
+      <div class="card">
+        <div class="card-title">Executive Summary</div>
+        <div class="exec-summary">${escHtml(synth.executive_summary)}</div>
+      </div>`;
+  }
+
+  // Main findings
+  if ((synth.main_findings || []).length) {
+    html += `<div class="card"><div class="card-title">Main Findings</div>`;
+    synth.main_findings.forEach(f => {
+      const conf = typeof f === 'object' ? f.confidence : null;
+      const text = typeof f === 'object' ? f.finding    : f;
+      const evid = typeof f === 'object' ? f.evidence   : null;
+      html += `
+        <div class="finding-item">
+          <div class="finding-text">
+            ${escHtml(text)}
+            ${conf ? `<span class="confidence-badge ${confClass(conf)}">${escHtml(conf)}</span>` : ''}
+          </div>
+          ${evid ? `<div class="finding-evidence">${escHtml(evid)}</div>` : ''}
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Policy implications
+  if ((synth.policy_implications || []).length) {
+    html += `
+      <div class="card">
+        <div class="card-title">Policy Implications</div>
+        <div class="tag-list">
+          ${synth.policy_implications.map(p => `<span class="tag-item green">${escHtml(p)}</span>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  // Key uncertainties
+  if ((synth.key_uncertainties || []).length) {
+    html += `
+      <div class="card">
+        <div class="card-title">Key Uncertainties</div>
+        <div class="tag-list">
+          ${synth.key_uncertainties.map(u => `<span class="tag-item">${escHtml(u)}</span>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  // Contradictions
+  if ((synth.contradictions || []).length) {
+    html += `
+      <div class="card">
+        <div class="card-title">Internal Contradictions</div>
+        <div class="tag-list">
+          ${synth.contradictions.map(c => `<span class="tag-item">${escHtml(c)}</span>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  // Keywords
+  if ((meta.keywords || []).length) {
+    html += `
+      <div class="card">
+        <div class="card-title">Keywords</div>
+        <div class="tag-list">
+          ${meta.keywords.map(k => `<span class="tag-item">${escHtml(k)}</span>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  // Visual insights
+  if (visual && visual.total_images_analyzed > 0) {
+    html += `
+      <div class="card">
+        <div class="card-title">Visual Insights — ${visual.total_images_analyzed} figure${visual.total_images_analyzed !== 1 ? 's' : ''} analysed</div>`;
+    (visual.key_visual_findings || []).forEach(vf => {
+      html += `
+        <div class="finding-item">
+          <div class="finding-text">Page ${vf.page}: ${escHtml(vf.caption || '')}</div>
+          <div class="finding-evidence">${escHtml(vf.finding || '')}</div>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // API cost
+  if (cost.total_cost_usd !== undefined) {
+    html += `
+      <div style="padding: 4px 0 8px;">
+        <span class="cost-pill">
+          💰 $${cost.total_cost_usd.toFixed(4)} · ${cost.total_calls || 0} Claude calls
+          (${cost.text_calls || 0} text, ${cost.vision_calls || 0} vision)
+        </span>
+      </div>`;
+  }
+
+  html += `</div>`;  // end fade-in
+  panel.innerHTML = html;
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+init();
+</script>
+</body>
+</html>

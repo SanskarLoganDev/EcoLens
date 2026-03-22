@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoLens — Research Papers</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green:       #1a6b3c;
+    --green-mid:   #2d9e5f;
+    --green-light: #e8f5ed;
+    --green-pale:  #f0faf4;
+    --amber:       #d97706;
+    --amber-light: #fef3c7;
+    --gray-100:    #f3f4f6;
+    --gray-200:    #e5e7eb;
+    --gray-400:    #9ca3af;
+    --gray-600:    #4b5563;
+    --gray-800:    #1f2937;
+    --gray-900:    #111827;
+    --font-display: 'DM Serif Display', Georgia, serif;
+    --font-body:    'DM Sans', system-ui, sans-serif;
+    --shadow:      0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
+    --shadow-lg:   0 4px 6px rgba(0,0,0,.07), 0 12px 40px rgba(0,0,0,.12);
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--gray-100);
+    color: var(--gray-800);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ───────────────────────────────────────────────── */
+  .header {
+    background: var(--green);
+    color: white;
+    padding: 28px 40px 26px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  }
+  .header-inner { max-width: 880px; margin: 0 auto; }
+  .header-row  { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .logo        { font-size: 28px; }
+  .header h1   { font-family: var(--font-display); font-size: 28px; font-weight: 400; }
+  .header p    { font-size: 14px; opacity: .75; margin-top: 2px; }
+  .api-status  { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; opacity: .8; margin-top: 10px; }
+  .dot         { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 2s infinite; }
+  .dot.offline { background: #f87171; animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── Main ─────────────────────────────────────────────────── */
+  .main { flex: 1; max-width: 880px; margin: 0 auto; padding: 40px 24px 64px; width: 100%; }
+
+  /* ── Feature cards ────────────────────────────────────────── */
+  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px; }
+
+  .feature-card {
+    background: white;
+    border-radius: 16px;
+    padding: 28px 28px 24px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform .15s, box-shadow .15s;
+    border: 2px solid transparent;
+    cursor: pointer;
+  }
+  .feature-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--green-mid);
+  }
+  .feature-icon { font-size: 36px; }
+  .feature-card h2 { font-family: var(--font-display); font-size: 22px; font-weight: 400; }
+  .feature-card p  { font-size: 14px; color: var(--gray-600); line-height: 1.6; flex: 1; }
+
+  .feature-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+  .feature-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--green);
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 9px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background .15s;
+  }
+  .feature-link:hover { background: var(--green-mid); }
+  .feature-cost { font-size: 11px; color: var(--gray-400); }
+
+  /* ── Papers overview ──────────────────────────────────────── */
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 400;
+    margin-bottom: 14px;
+    color: var(--gray-900);
+  }
+  .papers-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  .paper-mini {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+    border-left: 4px solid var(--green);
+  }
+  .paper-mini-name { font-size: 13px; font-weight: 500; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .paper-mini-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .tag-indexed   { background: var(--green-light);  color: var(--green); }
+  .tag-summarised { background: #dbeafe; color: #1d4ed8; }
+  .tag-none      { background: var(--gray-100); color: var(--gray-400); }
+
+  .papers-loading { font-size: 13px; color: var(--gray-400); padding: 8px 0; }
+
+  @keyframes fi { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  .fade-in { animation: fi .35s ease; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="header-row">
+      <div class="logo">🌿</div>
+      <h1>EcoLens — Research Papers</h1>
+    </div>
+    <p>Analyse and query your climate science paper library</p>
+    <div class="api-status">
+      <span class="dot" id="apiDot"></span>
+      <span id="apiStatus">Checking API…</span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Feature selection -->
+  <div class="feature-grid fade-in">
+
+    <div class="feature-card" onclick="location.href='summarizer.html'">
+      <div class="feature-icon">📄</div>
+      <h2>Paper Summarizer</h2>
+      <p>Run a deep analysis on a single PDF. Extracts metadata, summarises every section, assesses evidence strength, identifies key findings, and optionally analyses charts with Claude Vision.</p>
+      <div class="feature-footer">
+        <a class="feature-link" href="summarizer.html">Open Summarizer →</a>
+        <span class="feature-cost">~$0.05–$0.20 per paper</span>
+      </div>
+    </div>
+
+    <div class="feature-card" onclick="location.href='chat.html'">
+      <div class="feature-icon">💬</div>
+      <h2>Research Q&amp;A</h2>
+      <p>Ask free-form questions across your entire paper library. Retrieves the most relevant passages from any indexed paper and returns cited answers grounded in the actual PDF text.</p>
+      <div class="feature-footer">
+        <a class="feature-link" href="chat.html">Open Chat →</a>
+        <span class="feature-cost">~$0.015–$0.020 per question</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Papers status overview -->
+  <div class="section-title">Your paper library</div>
+  <div id="papersGrid" class="papers-grid">
+    <div class="papers-loading">Loading papers…</div>
+  </div>
+
+</div>
+
+<script>
+const API = 'http://localhost:8001';
+
+async function init() {
+  try {
+    const r = await fetch(`${API}/api/rag/health`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      document.getElementById('apiDot').classList.remove('offline');
+      document.getElementById('apiStatus').textContent = 'Connected — Research API :8001';
+      loadPapers();
+    } else throw new Error();
+  } catch {
+    document.getElementById('apiDot').classList.add('offline');
+    document.getElementById('apiStatus').textContent = 'API offline — start: uvicorn src.api.rag_api:app --port 8001';
+    document.getElementById('papersGrid').innerHTML =
+      '<div class="papers-loading">Cannot load papers — API is offline.</div>';
+  }
+}
+
+async function loadPapers() {
+  try {
+    const [availRes, resultsRes] = await Promise.all([
+      fetch(`${API}/api/summarizer/available`),
+      fetch(`${API}/api/summarizer/results`),
+    ]);
+    const availData   = await availRes.json();
+    const resultsData = await resultsRes.json();
+
+    const papers  = availData.papers   || [];
+    const results = resultsData.results || [];
+
+    // Build a set of PDF names that have at least one summary result
+    const summarisedPdfs = new Set(results.map(r => r.pdf_name).filter(Boolean));
+
+    const grid = document.getElementById('papersGrid');
+
+    if (!papers.length) {
+      grid.innerHTML = '<div class="papers-loading">No PDFs found in research_papers/</div>';
+      return;
+    }
+
+    grid.innerHTML = papers.map(p => {
+      const isIndexed    = p.indexed;
+      const isSummarised = summarisedPdfs.has(p.filename);
+      const name         = p.filename.replace('.pdf', '');
+
+      return `
+        <div class="paper-mini">
+          <div class="paper-mini-name" title="${p.filename}">${name}</div>
+          <div class="paper-mini-tags">
+            ${isIndexed    ? '<span class="tag tag-indexed">RAG indexed</span>'    : '<span class="tag tag-none">Not indexed</span>'}
+            ${isSummarised ? '<span class="tag tag-summarised">Summarised</span>' : '<span class="tag tag-none">No summary</span>'}
+          </div>
+        </div>`;
+    }).join('');
+
+  } catch (e) {
+    document.getElementById('papersGrid').innerHTML =
+      '<div class="papers-loading">Could not load paper list.</div>';
+  }
+}
+
+init();
+</script>
+</body>
+</html>

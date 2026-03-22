@@ -216,3 +216,13 @@ results/
 research_papers/
 
 .claude/
+
+# ── RAG vector database ───────────────────────────────────────────────────────
+# ChromaDB stores computed vector embeddings derived from the PDFs.
+# These are large binary files that do not belong in version control because:
+#   1. They are fully reproducible — run `indexer.py --all` to regenerate them
+#   2. They are platform-specific binary format (.bin files + SQLite)
+#   3. They can be large (grow with every paper indexed)
+#   4. Git cannot diff or merge binary files meaningfully
+# Anyone cloning this repo just runs the indexer once to rebuild the store.
+chroma_store/

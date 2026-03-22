@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "🌿 Start Carbon API",
+      "label": "🌿 Start Carbon API (:8000)",
       "type": "shell",
       "command": ".venv/Scripts/python.exe -m uvicorn src.api.carbon_api:app --reload --port 8000",
       "options": { "cwd": "${workspaceFolder}" },
@@ -11,11 +11,43 @@
       "problemMatcher": []
     },
     {
-      "label": "🌐 Open Carbon UI in browser",
+      "label": "🔬 Start RAG API (:8001)",
+      "type": "shell",
+      "command": ".venv/Scripts/python.exe -m uvicorn src.api.rag_api:app --reload --port 8001",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "new" },
+      "problemMatcher": []
+    },
+    {
+      "label": "🌐 Open Carbon UI",
       "type": "shell",
       "command": "start ui/carbon/index.html",
       "options": { "cwd": "${workspaceFolder}" },
       "presentation": { "reveal": "silent" },
+      "problemMatcher": []
+    },
+    {
+      "label": "🌐 Open Research Chat UI",
+      "type": "shell",
+      "command": "start ui/research/chat.html",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "silent" },
+      "problemMatcher": []
+    },
+    {
+      "label": "📥 RAG: Index ALL papers",
+      "type": "shell",
+      "command": ".venv/Scripts/python.exe src/services/research_paper_analyzer/rag/indexer.py --all",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "📋 RAG: List indexed papers",
+      "type": "shell",
+      "command": ".venv/Scripts/python.exe src/services/research_paper_analyzer/rag/indexer.py --list",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "shared" },
       "problemMatcher": []
     },
     {
@@ -27,9 +59,9 @@
       "problemMatcher": []
     },
     {
-      "label": "📦 Install FastAPI + uvicorn",
+      "label": "📦 Install RAG dependencies (chromadb)",
       "type": "shell",
-      "command": ".venv/Scripts/pip.exe install fastapi uvicorn[standard] python-multipart",
+      "command": ".venv/Scripts/pip.exe install chromadb",
       "options": { "cwd": "${workspaceFolder}" },
       "presentation": { "reveal": "always", "panel": "shared" },
       "problemMatcher": []

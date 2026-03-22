@@ -11,3 +11,7 @@ Pillow
 fastapi
 uvicorn[standard]
 python-multipart
+
+# RAG (Retrieval-Augmented Generation) — research paper Q&A
+chromadb
+voyageai

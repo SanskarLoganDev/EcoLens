@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "🌿 Carbon API (uvicorn)",
+      "name": "🌿 Carbon API (uvicorn :8000)",
       "type": "python",
       "request": "launch",
       "module": "uvicorn",
@@ -18,7 +18,73 @@
       "justMyCode": false
     },
     {
-      "name": "🧪 Run: analyzer.py (sample data)",
+      "name": "🔬 RAG API (uvicorn :8001)",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "src.api.rag_api:app",
+        "--reload",
+        "--port", "8001",
+        "--log-level", "info"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "📥 RAG: Index all papers",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/services/research_paper_analyzer/rag/indexer.py",
+      "args": ["--all"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "📥 RAG: Index ocean_acidification.pdf",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/services/research_paper_analyzer/rag/indexer.py",
+      "args": [
+        "src/services/research_paper_analyzer/research_papers/ocean_acidification.pdf"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "📋 RAG: List indexed papers",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/services/research_paper_analyzer/rag/indexer.py",
+      "args": ["--list"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "💬 RAG: Terminal Q&A (retriever test)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/services/research_paper_analyzer/rag/retriever.py",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "✂️  RAG: Test chunker",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/services/research_paper_analyzer/rag/chunker.py",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "🧪 Carbon: Run analyzer.py (sample data)",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/src/services/carbon/analyzer.py",
@@ -28,7 +94,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "🧪 Run: parser.py",
+      "name": "🧪 Carbon: Run parser.py",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/src/services/carbon/parser.py",
@@ -37,7 +103,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "🧪 Run: calculator.py",
+      "name": "🧪 Carbon: Run calculator.py",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/src/services/carbon/calculator.py",
@@ -46,7 +112,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "🧪 Run: client.py (API key test)",
+      "name": "🧪 Carbon: Run client.py (API key test)",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/src/services/carbon/client.py",

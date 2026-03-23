@@ -6,12 +6,7 @@
       "type": "python",
       "request": "launch",
       "module": "uvicorn",
-      "args": [
-        "src.api.carbon_api:app",
-        "--reload",
-        "--port", "8000",
-        "--log-level", "info"
-      ],
+      "args": ["src.api.carbon_api:app", "--reload", "--port", "8000", "--log-level", "info"],
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env",
       "console": "integratedTerminal",
@@ -22,12 +17,18 @@
       "type": "python",
       "request": "launch",
       "module": "uvicorn",
-      "args": [
-        "src.api.rag_api:app",
-        "--reload",
-        "--port", "8001",
-        "--log-level", "info"
-      ],
+      "args": ["src.api.rag_api:app", "--reload", "--port", "8001", "--log-level", "info"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "🛰️ Satellite API (uvicorn :8002)",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["src.api.satellite_api:app", "--reload", "--port", "8002", "--log-level", "info"],
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env",
       "console": "integratedTerminal",
@@ -48,9 +49,7 @@
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/src/services/research_paper_analyzer/rag/indexer.py",
-      "args": [
-        "src/services/research_paper_analyzer/research_papers/ocean_acidification.pdf"
-      ],
+      "args": ["src/services/research_paper_analyzer/research_papers/ocean_acidification.pdf"],
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env",
       "console": "integratedTerminal"

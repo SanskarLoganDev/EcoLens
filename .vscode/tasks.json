@@ -1,4 +1,4 @@
-﻿{
+{
   "version": "2.0.0",
   "tasks": [
     {
@@ -19,6 +19,14 @@
       "problemMatcher": []
     },
     {
+      "label": "🛰️ Start Satellite API (:8002)",
+      "type": "shell",
+      "command": ".venv/Scripts/python.exe -m uvicorn src.api.satellite_api:app --reload --port 8002",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "new" },
+      "problemMatcher": []
+    },
+    {
       "label": "🌐 Open Carbon UI",
       "type": "shell",
       "command": "start ui/carbon/index.html",
@@ -30,6 +38,14 @@
       "label": "🌐 Open Research UI (landing page)",
       "type": "shell",
       "command": "start ui/research/index.html",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "silent" },
+      "problemMatcher": []
+    },
+    {
+      "label": "🌐 Open Satellite UI",
+      "type": "shell",
+      "command": "start ui/satellite/index.html",
       "options": { "cwd": "${workspaceFolder}" },
       "presentation": { "reveal": "silent" },
       "problemMatcher": []

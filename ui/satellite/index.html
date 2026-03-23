@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoLens — Satellite Monitor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green:       #1a6b3c;
+    --green-mid:   #2d9e5f;
+    --green-light: #e8f5ed;
+    --green-pale:  #f0faf4;
+    --amber:       #d97706;
+    --amber-light: #fef3c7;
+    --red:         #dc2626;
+    --red-light:   #fee2e2;
+    --blue:        #1d4ed8;
+    --blue-light:  #dbeafe;
+    --gray-50:     #f9fafb;
+    --gray-100:    #f3f4f6;
+    --gray-200:    #e5e7eb;
+    --gray-300:    #d1d5db;
+    --gray-400:    #9ca3af;
+    --gray-600:    #4b5563;
+    --gray-800:    #1f2937;
+    --gray-900:    #111827;
+    --font-display:'DM Serif Display', Georgia, serif;
+    --font-body:   'DM Sans', system-ui, sans-serif;
+    --shadow:      0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
+    --shadow-lg:   0 4px 6px rgba(0,0,0,.07), 0 12px 40px rgba(0,0,0,.12);
+  }
+
+  body { font-family: var(--font-body); background: var(--gray-100); color: var(--gray-800); font-size: 14px; min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── Header ── */
+  .header { background: var(--green); color: white; padding: 16px 24px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.15); position: sticky; top: 0; z-index: 20; }
+  .back-btn { background: rgba(255,255,255,.15); border: none; color: white; padding: 7px 12px; border-radius: 8px; font-family: var(--font-body); font-size: 13px; cursor: pointer; transition: background .15s; }
+  .back-btn:hover { background: rgba(255,255,255,.25); }
+  .header-title { flex: 1; }
+  .header-title h1 { font-family: var(--font-display); font-size: 20px; font-weight: 400; }
+  .header-title p  { font-size: 12px; opacity: .75; margin-top: 1px; }
+  .api-status { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: .85; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 2s infinite; }
+  .dot.offline { background: #f87171; animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── Layout ── */
+  .page { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 58px); }
+
+  /* ── Left panel ── */
+  .controls { width: 340px; flex-shrink: 0; background: white; border-right: 1px solid var(--gray-200); display: flex; flex-direction: column; overflow-y: auto; }
+  .controls::-webkit-scrollbar { width: 4px; }
+  .controls::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 2px; }
+
+  .section { padding: 18px 18px 14px; border-bottom: 1px solid var(--gray-100); }
+  .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-400); margin-bottom: 12px; }
+
+  /* Tabs */
+  .tabs { display: flex; background: var(--gray-100); border-radius: 10px; padding: 3px; gap: 2px; margin-bottom: 14px; }
+  .tab { flex: 1; padding: 8px; border: none; background: transparent; border-radius: 8px; font-family: var(--font-body); font-size: 13px; font-weight: 500; color: var(--gray-600); cursor: pointer; transition: all .15s; text-align: center; }
+  .tab.active { background: white; color: var(--green); box-shadow: var(--shadow); }
+
+  /* Preset region cards */
+  .preset-grid { display: flex; flex-direction: column; gap: 8px; }
+  .preset-card { border: 1px solid var(--gray-200); border-radius: 10px; padding: 12px; cursor: pointer; transition: all .15s; display: flex; align-items: flex-start; gap: 10px; user-select: none; }
+  .preset-card:hover { border-color: var(--green-mid); background: var(--green-pale); }
+  .preset-card.selected { border-color: var(--green); background: var(--green-light); }
+  .preset-icon { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
+  .preset-info { flex: 1; min-width: 0; }
+  .preset-name { font-size: 13px; font-weight: 500; }
+  .preset-dates { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+  .cloud-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; flex-shrink: 0; }
+  .cloud-low    { background: var(--green-light); color: var(--green); }
+  .cloud-medium { background: var(--amber-light); color: var(--amber); }
+  .cloud-high   { background: var(--red-light);   color: var(--red); }
+
+  /* Custom form */
+  .form-row { margin-bottom: 12px; }
+  .form-row label { display: block; font-size: 12px; font-weight: 500; color: var(--gray-600); margin-bottom: 4px; }
+  .form-row input, .form-row select { width: 100%; padding: 9px 12px; border: 1px solid var(--gray-200); border-radius: 8px; font-family: var(--font-body); font-size: 13px; color: var(--gray-800); background: var(--gray-50); outline: none; transition: border-color .15s; }
+  .form-row input:focus, .form-row select:focus { border-color: var(--green-mid); background: white; }
+  .form-row-split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .form-row-split label { display: block; font-size: 12px; font-weight: 500; color: var(--gray-600); margin-bottom: 4px; }
+  .form-row-split input { width: 100%; padding: 9px 12px; border: 1px solid var(--gray-200); border-radius: 8px; font-family: var(--font-body); font-size: 13px; color: var(--gray-800); background: var(--gray-50); outline: none; transition: border-color .15s; }
+  .form-row-split input:focus { border-color: var(--green-mid); background: white; }
+
+  /* Layer selector */
+  .layer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .layer-card { border: 1px solid var(--gray-200); border-radius: 8px; padding: 10px; cursor: pointer; transition: all .15s; user-select: none; }
+  .layer-card:hover { border-color: var(--green-mid); }
+  .layer-card.selected { border-color: var(--green); background: var(--green-light); }
+  .layer-name { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .layer-res  { font-size: 10px; color: var(--gray-400); }
+  .layer-freq { font-size: 10px; color: var(--gray-400); }
+
+  /* Run button */
+  .run-btn { width: 100%; padding: 13px; background: var(--green); color: white; border: none; border-radius: 10px; font-family: var(--font-body); font-size: 14px; font-weight: 500; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .run-btn:hover:not(:disabled) { background: var(--green-mid); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,107,60,.3); }
+  .run-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* Past results */
+  .result-item { padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background .15s; margin-bottom: 4px; border: 1px solid transparent; }
+  .result-item:hover { background: var(--gray-50); border-color: var(--gray-200); }
+  .result-item.active { background: var(--green-pale); border-color: var(--green-mid); }
+  .result-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .result-meta { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+  .change-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  .change-yes { background: var(--red); }
+  .change-no  { background: var(--green-mid); }
+
+  /* ── Right panel ── */
+  .results-panel { flex: 1; overflow-y: auto; background: var(--gray-50); }
+  .results-panel::-webkit-scrollbar { width: 4px; }
+  .results-panel::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 2px; }
+
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 80px 40px; gap: 14px; color: var(--gray-400); min-height: 60vh; }
+  .empty-icon { font-size: 56px; }
+  .empty h2 { font-family: var(--font-display); font-size: 22px; font-weight: 400; color: var(--gray-600); }
+  .empty p  { font-size: 14px; max-width: 380px; line-height: 1.7; }
+
+  /* Progress log */
+  .progress-box { margin: 24px; background: var(--gray-900); border-radius: 12px; padding: 18px 20px; }
+  .progress-title { font-size: 12px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+  .progress-log   { font-family: 'Courier New', monospace; font-size: 13px; color: #86efac; line-height: 1.8; }
+  .progress-log .err { color: #fca5a5; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  .cursor { display: inline-block; width: 8px; height: 14px; background: #86efac; margin-left: 4px; animation: blink 1s infinite; vertical-align: middle; }
+
+  /* Result content */
+  .result-content { padding: 24px 28px 60px; }
+  @keyframes fi { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  .fade-in { animation: fi .35s ease; }
+
+  /* Images */
+  .image-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .img-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+  .img-label { padding: 10px 14px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-600); border-bottom: 1px solid var(--gray-100); display: flex; justify-content: space-between; align-items: center; }
+  .img-date { font-size: 12px; font-weight: 400; color: var(--gray-400); text-transform: none; letter-spacing: 0; }
+  .img-card img { width: 100%; display: block; }
+  .img-placeholder { width: 100%; aspect-ratio: 1; background: var(--gray-100); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--gray-400); font-size: 13px; gap: 8px; }
+
+  /* Metrics */
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+  .metric-box { background: white; border-radius: 12px; padding: 16px; box-shadow: var(--shadow); text-align: center; }
+  .metric-val { font-family: var(--font-display); font-size: 22px; color: var(--gray-900); }
+  .metric-val.red { color: var(--red); }
+  .metric-val.green { color: var(--green); }
+  .metric-lbl { font-size: 11px; color: var(--gray-400); margin-top: 4px; }
+
+  .card { background: white; border-radius: 12px; padding: 20px 22px; box-shadow: var(--shadow); margin-bottom: 16px; }
+  .card-title { font-family: var(--font-display); font-size: 17px; font-weight: 400; margin-bottom: 12px; color: var(--gray-900); }
+
+  .vision-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .vision-card { background: var(--gray-50); border-radius: 10px; padding: 14px; }
+  .vision-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-400); margin-bottom: 8px; }
+
+  .cover-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .cover-label { font-size: 12px; width: 60px; flex-shrink: 0; color: var(--gray-600); }
+  .cover-bar-wrap { flex: 1; background: var(--gray-100); border-radius: 20px; height: 8px; overflow: hidden; }
+  .cover-bar { height: 100%; border-radius: 20px; transition: width .6s ease; }
+  .cover-pct { font-size: 11px; width: 32px; text-align: right; color: var(--gray-400); }
+
+  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 12px; padding: 3px 10px; border-radius: 20px; background: var(--gray-100); color: var(--gray-600); }
+  .tag.green { background: var(--green-light); color: var(--green); }
+  .tag.red   { background: var(--red-light);   color: var(--red); }
+
+  .cost-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--green-light); color: var(--green); font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px; }
+  .sev-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .sev-critical { background: #fee2e2; color: #b91c1c; }
+  .sev-high     { background: #ffedd5; color: #c2410c; }
+  .sev-moderate { background: var(--amber-light); color: var(--amber); }
+  .sev-low      { background: var(--green-light); color: var(--green); }
+  .sev-minimal  { background: var(--gray-100); color: var(--gray-600); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <button class="back-btn" onclick="history.back()">← Back</button>
+  <div class="header-title">
+    <h1>🛰️ Satellite Monitor</h1>
+    <p>Detect and quantify environmental change using NASA satellite imagery</p>
+  </div>
+  <div class="api-status">
+    <span class="dot" id="apiDot"></span>
+    <span id="apiStatus">Connecting…</span>
+  </div>
+</div>
+
+<div class="page">
+
+  <aside class="controls">
+
+    <div class="section">
+      <div class="tabs">
+        <button class="tab active" id="tabPreset" onclick="switchTab('preset')">📍 Preset Regions</button>
+        <button class="tab"        id="tabCustom" onclick="switchTab('custom')">✏️ Custom</button>
+      </div>
+
+      <div id="panelPreset">
+        <div id="presetGrid" class="preset-grid">
+          <div style="font-size:13px;color:var(--gray-400)">Loading regions…</div>
+        </div>
+      </div>
+
+      <div id="panelCustom" style="display:none">
+        <div class="form-row">
+          <label>Location name</label>
+          <input type="text" id="customName" placeholder="e.g. My Forest Site">
+        </div>
+        <div class="form-row-split">
+          <div><label>Latitude</label><input type="number" id="customLat" placeholder="-3.4653" step="any"></div>
+          <div><label>Longitude</label><input type="number" id="customLon" placeholder="-62.21" step="any"></div>
+        </div>
+        <div class="form-row-split">
+          <div><label>Before date</label><input type="date" id="customBefore"></div>
+          <div><label>After date</label><input type="date" id="customAfter"></div>
+        </div>
+        <div class="form-row">
+          <label>Analysis type</label>
+          <select id="customType">
+            <option value="general">General</option>
+            <option value="deforestation">Deforestation</option>
+            <option value="urban_sprawl">Urban Sprawl</option>
+            <option value="ice_melt">Ice Melt</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Satellite Layer</div>
+      <div id="layerGrid" class="layer-grid">
+        <div style="font-size:13px;color:var(--gray-400)">Loading…</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <button class="run-btn" id="runBtn" onclick="runAnalysis()" disabled>
+        🛰️ Run Analysis
+      </button>
+      <div id="runStatus" style="margin-top:10px;font-size:12px;color:var(--gray-400);text-align:center"></div>
+    </div>
+
+    <div class="section" style="border-bottom:none;flex:1">
+      <div class="section-title">Past Results</div>
+      <div id="resultsList">
+        <div style="font-size:13px;color:var(--gray-400)">No results yet.</div>
+      </div>
+    </div>
+
+  </aside>
+
+  <main class="results-panel" id="resultsPanel">
+    <div class="empty" id="emptyState">
+      <div class="empty-icon">🛰️</div>
+      <h2>Select a region and run analysis</h2>
+      <p>Click a preset region card to configure it, then hit <strong>Run Analysis</strong>. Results appear here with before/after satellite images and AI-powered change detection.</p>
+    </div>
+  </main>
+
+</div>
+
+<script>
+const API = 'http://localhost:8002';
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let regionsMap    = {};   // key → region object (populated in loadRegions)
+let selectedRegion = null;
+let selectedLayer  = 'viirs_day';
+let currentJobId   = null;
+let pollTimer      = null;
+let activeResultId = null;
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const r = await fetch(`${API}/api/satellite/health`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      setApiStatus(true);
+      await Promise.all([loadRegions(), loadLayers(), loadResults()]);
+    } else throw new Error();
+  } catch {
+    setApiStatus(false);
+  }
+}
+
+function setApiStatus(online) {
+  document.getElementById('apiDot').classList.toggle('offline', !online);
+  document.getElementById('apiStatus').textContent = online
+    ? 'Connected — Satellite API :8002'
+    : 'Offline — start: uvicorn src.api.satellite_api:app --port 8002';
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('tabPreset').classList.toggle('active', tab === 'preset');
+  document.getElementById('tabCustom').classList.toggle('active', tab === 'custom');
+  document.getElementById('panelPreset').style.display = tab === 'preset' ? '' : 'none';
+  document.getElementById('panelCustom').style.display = tab === 'custom' ? '' : 'none';
+  selectedRegion = null;
+  updateRunBtn();
+}
+
+// ── Regions ───────────────────────────────────────────────────────────────────
+async function loadRegions() {
+  const r    = await fetch(`${API}/api/satellite/regions`);
+  const data = await r.json();
+
+  // Store all regions in a Map — avoids passing complex objects via HTML onclick
+  regionsMap = {};
+  data.regions.forEach(reg => { regionsMap[reg.key] = reg; });
+
+  const grid = document.getElementById('presetGrid');
+  grid.innerHTML = data.regions.map(reg => `
+    <div class="preset-card" id="rc-${reg.key}" onclick="selectRegion('${reg.key}')">
+      <div class="preset-icon">${reg.emoji}</div>
+      <div class="preset-info">
+        <div class="preset-name">${escHtml(reg.name)}</div>
+        <div class="preset-dates">${reg.before_date} → ${reg.after_date}</div>
+      </div>
+      <span class="cloud-badge cloud-${reg.cloud_risk}" title="Cloud risk: ${reg.cloud_risk}">
+        ${reg.cloud_risk === 'low' ? '☀️ Clear' : reg.cloud_risk === 'medium' ? '⛅ Some' : '☁️ Cloudy'}
+      </span>
+    </div>`).join('');
+}
+
+// selectRegion receives a plain string key — no JSON parsing, no escaping issues
+function selectRegion(key) {
+  const reg = regionsMap[key];
+  if (!reg) return;
+
+  selectedRegion = reg;
+
+  document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'));
+  const card = document.getElementById(`rc-${key}`);
+  if (card) card.classList.add('selected');
+
+  if (reg.recommended_layer) selectLayer(reg.recommended_layer);
+  updateRunBtn();
+}
+
+// ── Layers ────────────────────────────────────────────────────────────────────
+async function loadLayers() {
+  const r    = await fetch(`${API}/api/satellite/layers`);
+  const data = await r.json();
+  const grid = document.getElementById('layerGrid');
+
+  grid.innerHTML = data.layers.map(l => `
+    <div class="layer-card ${l.key === selectedLayer ? 'selected' : ''}"
+         id="lc-${l.key}" onclick="selectLayer('${l.key}')">
+      <div class="layer-name">${escHtml(l.name)}</div>
+      <div class="layer-res">${l.resolution} · ${l.frequency}</div>
+    </div>`).join('');
+}
+
+function selectLayer(key) {
+  selectedLayer = key;
+  document.querySelectorAll('.layer-card').forEach(c => c.classList.remove('selected'));
+  const card = document.getElementById(`lc-${key}`);
+  if (card) card.classList.add('selected');
+}
+
+// ── Run button ────────────────────────────────────────────────────────────────
+function updateRunBtn() {
+  const btn = document.getElementById('runBtn');
+  const isPreset = document.getElementById('tabPreset').classList.contains('active');
+  if (isPreset) {
+    btn.disabled = !selectedRegion;
+  } else {
+    const ok = document.getElementById('customLat').value &&
+               document.getElementById('customLon').value &&
+               document.getElementById('customBefore').value &&
+               document.getElementById('customAfter').value;
+    btn.disabled = !ok;
+  }
+}
+
+['customLat','customLon','customBefore','customAfter'].forEach(id =>
+  document.getElementById(id).addEventListener('input', updateRunBtn)
+);
+
+// ── Run analysis ──────────────────────────────────────────────────────────────
+async function runAnalysis() {
+  const isPreset = document.getElementById('tabPreset').classList.contains('active');
+
+  const body = isPreset
+    ? { region_key: selectedRegion.key, layer: selectedLayer }
+    : {
+        lat:           parseFloat(document.getElementById('customLat').value),
+        lon:           parseFloat(document.getElementById('customLon').value),
+        before_date:   document.getElementById('customBefore').value,
+        after_date:    document.getElementById('customAfter').value,
+        location_name: document.getElementById('customName').value || null,
+        analysis_type: document.getElementById('customType').value,
+        layer:         selectedLayer,
+      };
+
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('runStatus').textContent = '⏳ Starting…';
+
+  try {
+    const r    = await fetch(`${API}/api/satellite/analyze`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Failed to start analysis');
+
+    currentJobId = data.job_id;
+    showProgress();
+    startPolling();
+  } catch (e) {
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runStatus').textContent = `❌ ${e.message}`;
+  }
+}
+
+function showProgress() {
+  document.getElementById('resultsPanel').innerHTML = `
+    <div class="progress-box">
+      <div class="progress-title">🛰️ Analysis in progress…</div>
+      <div class="progress-log" id="progressLog"><div>Starting…</div></div>
+    </div>`;
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(pollJob, 2000);
+}
+
+async function pollJob() {
+  if (!currentJobId) return;
+  try {
+    const r    = await fetch(`${API}/api/satellite/status/${currentJobId}`);
+    const data = await r.json();
+
+    const logEl = document.getElementById('progressLog');
+    if (logEl) {
+      logEl.innerHTML = data.progress_log
+        .map(line => `<div class="${line.startsWith('❌') ? 'err' : ''}">${escHtml(line)}</div>`)
+        .join('') + (data.status === 'running' ? '<span class="cursor"></span>' : '');
+      logEl.parentElement.scrollTop = logEl.parentElement.scrollHeight;
+    }
+
+    if (data.status === 'done') {
+      clearInterval(pollTimer);
+      document.getElementById('runBtn').disabled = false;
+      document.getElementById('runStatus').textContent = '';
+      await loadResults();
+      if (data.result_id) loadResult(data.result_id);
+    } else if (data.status === 'error') {
+      clearInterval(pollTimer);
+      document.getElementById('runBtn').disabled = false;
+      document.getElementById('runStatus').textContent = '❌ Analysis failed — see log above';
+    }
+  } catch (e) { /* transient network hiccup — keep polling */ }
+}
+
+// ── Past results ──────────────────────────────────────────────────────────────
+async function loadResults() {
+  try {
+    const r       = await fetch(`${API}/api/satellite/results`);
+    const data    = await r.json();
+    const list    = document.getElementById('resultsList');
+    const results = data.results || [];
+
+    if (!results.length) {
+      list.innerHTML = '<div style="font-size:13px;color:var(--gray-400)">No results yet.</div>';
+      return;
+    }
+
+    list.innerHTML = results.map(res => `
+      <div class="result-item ${res.id === activeResultId ? 'active' : ''}"
+           id="ri-${res.id}"
+           onclick="loadResult('${res.id}')">
+        <div class="result-name">
+          <span class="change-dot ${res.change_detected ? 'change-yes' : 'change-no'}"></span>
+          ${escHtml(res.location_name)}
+        </div>
+        <div class="result-meta">${res.before_date} → ${res.after_date}${res.layer ? ' · ' + res.layer : ''}</div>
+      </div>`).join('');
+  } catch (e) {
+    console.error('loadResults failed:', e);
+  }
+}
+
+// ── Render a result ───────────────────────────────────────────────────────────
+async function loadResult(resultId) {
+  activeResultId = resultId;
+  document.querySelectorAll('.result-item').forEach(el => el.classList.remove('active'));
+  const item = document.getElementById(`ri-${resultId}`);
+  if (item) item.classList.add('active');
+
+  document.getElementById('resultsPanel').innerHTML =
+    '<div class="empty"><div class="empty-icon">⏳</div><h2>Loading result…</h2></div>';
+
+  try {
+    const r = await fetch(`${API}/api/satellite/results/${resultId}`);
+    if (!r.ok) throw new Error('Could not load result');
+    await renderResult(await r.json());
+  } catch (e) {
+    document.getElementById('resultsPanel').innerHTML =
+      `<div class="empty"><div class="empty-icon">❌</div><h2>Error</h2><p>${escHtml(e.message)}</p></div>`;
+  }
+}
+
+async function renderResult(d) {
+  const panel = document.getElementById('resultsPanel');
+  const loc   = d.location         || {};
+  const tp    = d.time_period       || {};
+  const chg   = d.changes           || {};
+  const vis   = d.vision_analysis   || {};
+  const cost  = d.api_cost          || {};
+  const imgs  = d.images            || {};
+  const metrics = chg.metrics       || {};
+
+  // Load images — returns null if file doesn't exist (old deleted downloads)
+  const [beforeSrc, afterSrc] = await Promise.all([
+    loadImageSrc(imgs.before?.image_path),
+    loadImageSrc(imgs.after?.image_path),
+  ]);
+
+  const sevClass = { critical:'sev-critical', high:'sev-high', moderate:'sev-moderate',
+                     low:'sev-low', minimal:'sev-minimal' }[chg.severity] || 'sev-minimal';
+
+  const before      = vis.before_analysis || {};
+  const after       = vis.after_analysis  || {};
+  const beforeCover = before.land_cover   || {};
+  const afterCover  = after.land_cover    || {};
+
+  const coverBars = (cover) => [
+    { label:'Forest',  val: cover.forest_pct  || 0, color:'#16a34a' },
+    { label:'Urban',   val: cover.urban_pct   || 0, color:'#6b7280' },
+    { label:'Water',   val: cover.water_pct   || 0, color:'#2563eb' },
+    { label:'Cleared', val: cover.cleared_pct || 0, color:'#d97706' },
+  ].map(it => `
+    <div class="cover-item">
+      <span class="cover-label">${it.label}</span>
+      <div class="cover-bar-wrap"><div class="cover-bar" style="width:${it.val}%;background:${it.color}"></div></div>
+      <span class="cover-pct">${it.val}%</span>
+    </div>`).join('');
+
+  const imgCard = (src, label, date) => `
+    <div class="img-card">
+      <div class="img-label"><span>${label}</span><span class="img-date">${escHtml(date || '')}</span></div>
+      ${src
+        ? `<img src="${src}" alt="${label} satellite image">`
+        : `<div class="img-placeholder">🖼️<span>Image file not on disk<br><small>Re-run analysis to regenerate</small></span></div>`}
+    </div>`;
+
+  panel.innerHTML = `<div class="result-content fade-in">
+
+    <div style="margin-bottom:20px">
+      <div style="font-family:var(--font-display);font-size:26px;font-weight:400;color:var(--gray-900);margin-bottom:8px">${escHtml(loc.name || '')}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--gray-600);align-items:center">
+        <span>📅 ${tp.before || ''} → ${tp.after || ''} (${tp.days_elapsed || '?'} days)</span>
+        <span>📐 ${(loc.lat||0).toFixed(4)}, ${(loc.lon||0).toFixed(4)}</span>
+        <span class="sev-pill ${sevClass}">${(chg.severity||'').toUpperCase() || 'N/A'} ${chg.severity_score ? `(${chg.severity_score}/10)` : ''}</span>
+        ${cost.total_cost_usd ? `<span class="cost-pill">💰 $${cost.total_cost_usd.toFixed(4)}</span>` : ''}
+      </div>
+    </div>
+
+    <div class="image-row">
+      ${imgCard(beforeSrc, 'Before', imgs.before?.date || tp.before)}
+      ${imgCard(afterSrc,  'After',  imgs.after?.date  || tp.after)}
+    </div>
+
+    <div class="summary-grid">
+      <div class="metric-box">
+        <div class="metric-val">${metrics.total_area_km2 ? metrics.total_area_km2.toLocaleString() : '—'}</div>
+        <div class="metric-lbl">Area monitored (km²)</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-val ${chg.change_detected ? 'red' : 'green'}">${chg.change_detected ? 'Yes ⚠️' : 'No ✓'}</div>
+        <div class="metric-lbl">Change detected</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-val" style="font-size:16px">${escHtml(chg.change_type || '—')}</div>
+        <div class="metric-lbl">Change type</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Land Cover — Before vs After</div>
+      <div class="vision-row">
+        <div class="vision-card">
+          <div class="vision-label">Before (${tp.before || ''})</div>
+          ${coverBars(beforeCover)}
+          ${before.overall_description ? `<div style="margin-top:10px;font-size:12px;color:var(--gray-600);line-height:1.6">${escHtml(before.overall_description)}</div>` : ''}
+        </div>
+        <div class="vision-card">
+          <div class="vision-label">After (${tp.after || ''})</div>
+          ${coverBars(afterCover)}
+          ${after.overall_description ? `<div style="margin-top:10px;font-size:12px;color:var(--gray-600);line-height:1.6">${escHtml(after.overall_description)}</div>` : ''}
+        </div>
+      </div>
+    </div>
+
+    ${chg.change_summary ? `
+    <div class="card">
+      <div class="card-title">Change Summary</div>
+      <p style="font-size:14px;line-height:1.7;color:var(--gray-800)">${escHtml(chg.change_summary)}</p>
+    </div>` : ''}
+
+    ${chg.environmental_impact ? `
+    <div class="card">
+      <div class="card-title">Environmental Impact</div>
+      <p style="font-size:14px;line-height:1.7;color:var(--gray-800)">${escHtml(chg.environmental_impact)}</p>
+    </div>` : ''}
+
+    ${(chg.detected_features?.length || chg.lost_features?.length) ? `
+    <div class="card">
+      <div class="card-title">Detected Changes</div>
+      ${chg.detected_features?.length ? `<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:var(--gray-400);margin-bottom:6px">NEW FEATURES</div><div class="tag-list">${chg.detected_features.map(f=>`<span class="tag red">${escHtml(f)}</span>`).join('')}</div></div>` : ''}
+      ${chg.lost_features?.length ? `<div><div style="font-size:11px;font-weight:600;color:var(--gray-400);margin-bottom:6px">LOST FEATURES</div><div class="tag-list">${chg.lost_features.map(f=>`<span class="tag green">${escHtml(f)}</span>`).join('')}</div></div>` : ''}
+    </div>` : ''}
+
+    ${Object.keys(metrics).filter(k=>!['primary_metric_name','primary_metric_value','land_cover_changes'].includes(k)).length ? `
+    <div class="card">
+      <div class="card-title">Quantified Metrics</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        ${Object.entries(metrics)
+          .filter(([k])=>!['primary_metric_name','primary_metric_value','land_cover_changes'].includes(k))
+          .map(([k,v])=>`<tr style="border-bottom:1px solid var(--gray-100)"><td style="padding:8px 0;color:var(--gray-600)">${k.replace(/_/g,' ')}</td><td style="padding:8px 0;text-align:right;font-weight:500">${typeof v==='number'?v.toLocaleString(undefined,{maximumFractionDigits:2}):escHtml(String(v))}</td></tr>`)
+          .join('')}
+      </table>
+    </div>` : ''}
+
+  </div>`;
+}
+
+async function loadImageSrc(path) {
+  if (!path) return null;
+  try {
+    const r = await fetch(`${API}/api/satellite/image?path=${encodeURIComponent(path)}`);
+    if (!r.ok) return null;   // file deleted / not found — show placeholder
+    const data = await r.json();
+    return data.data_uri || null;
+  } catch {
+    return null;
+  }
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
+</script>
+</body>
+</html>

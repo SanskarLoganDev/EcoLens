@@ -1,369 +1,204 @@
 # Satellite Environmental Monitor
 
-An AI-powered satellite image analysis tool that detects and quantifies environmental changes using NASA GIBS satellite imagery and Claude Vision API.
+AI-powered satellite image analysis tool that fetches before/after imagery from NASA GIBS, runs Claude Vision to detect environmental changes, and quantifies the results as hard metrics (area lost, carbon emissions, severity score).
 
-## Features
+---
 
-- **Satellite Image Fetching**: Download before/after images from NASA GIBS (Global Imagery Browse Services)
-- **Multiple Satellite Products**: Support for Landsat, Sentinel-2, MODIS, and VIIRS imagery
-- **AI Vision Analysis**: Analyze satellite images using Claude's vision capabilities
-- **Change Detection**: Quantify environmental changes (deforestation, ice melt, urban sprawl)
-- **Carbon Emission Estimates**: Calculate CO2 emissions from forest loss
-- **Multi-Format Reports**: Generate JSON, Markdown, and CSV reports
-- **Cost Tracking**: Monitor Claude API usage and costs
-- **Pre-defined Regions**: Quick analysis of known environmental hotspots
-- **No API Key Required**: GIBS provides open-access satellite imagery
+## The Two Ways to Use This Feature
 
-## Project Structure
+| Method | When to use |
+|---|---|
+| **Browser UI** | Best for exploration, viewing results visually, comparing images side-by-side |
+| **Terminal / VS Code** | Best for scripting, batch runs, or when you want direct CLI output |
 
-```
-satellite/
-├── analyzer.py                    # Main orchestrator/entry point
-├── satellite_fetcher.py           # NASA GIBS API integration
-├── satellite_vision_analyzer.py   # Claude Vision analysis
-├── change_detector.py             # Change quantification
-├── report_generator.py            # Multi-format report generation
-├── client.py                      # Claude API wrapper
-├── prompts.py                     # AI prompts for analysis
-├── satellite_config.py            # GIBS configuration and region presets
-├── geo_utils.py                   # Geographic utilities
-├── data/                          # Satellite images (auto-created)
-│   ├── downloads/                 # Downloaded satellite images
-│   └── cache/                     # API response cache
-├── results/                       # Analysis reports (auto-created)
-│   ├── *_analysis.json           # Complete analysis data
-│   ├── *_report.md               # Human-readable summary
-│   └── *_metrics.csv             # Spreadsheet-ready metrics
-└── README.md
-```
+---
 
-## Prerequisites
+## Setup
 
-### Python Packages
-```bash
-pip install anthropic python-dotenv requests pillow
-```
+### Prerequisites
 
-### API Keys
+- `CLAUDE_API_KEY` in `.env` (for Vision API calls)
+- No NASA API key needed — GIBS is open access
 
-**Claude API Key** (Required)
-- Get from: https://console.anthropic.com/
-- Add to `.env` file in project root
-
-**NASA GIBS** (No API Key Required!)
-- GIBS provides open-access satellite imagery
-- No registration or API key needed
-- Imagery updated daily from multiple satellites
-
-### Environment Variables
-
-Create a `.env` file in the project root:
-```
-CLAUDE_API_KEY=your_claude_api_key_here
-```
-
-That's it! No NASA API key needed for GIBS.
-
-## How to Run
-
-### Basic Usage
-
-From the project root directory:
+### Install dependencies
 
 ```bash
-python src/services/satellite/analyzer.py <region_or_options>
+pip install -r requirements.txt
 ```
 
-### Option 1: Analyze Pre-defined Region
+Core packages: `anthropic`, `requests`, `Pillow`, `python-dotenv`
 
+---
+
+---
+
+# Method 1 — Browser UI
+
+## How to Start
+
+**Step 1 — Start the Satellite API server**
+
+VS Code Task:
+```
+Terminal > Run Task > 🛰️ Start Satellite API (:8002)
+```
+
+Or F5 → select **"🛰️ Satellite API (uvicorn :8002)"**
+
+Or terminal:
 ```bash
-# Analyze Amazon rainforest deforestation
-python src/services/satellite/analyzer.py amazon_basin
+uvicorn src.api.satellite_api:app --reload --port 8002
+```
 
-# Analyze Greenland ice melt
-python src/services/satellite/analyzer.py arctic_greenland
+**Step 2 — Open the UI**
 
-# Analyze Las Vegas urban sprawl
+VS Code Task:
+```
+Terminal > Run Task > 🌐 Open Satellite UI
+```
+
+Or double-click `ui/satellite/index.html`.
+
+## UI Walkthrough
+
+**Left panel — Configure your analysis:**
+
+1. **Preset Regions tab** — click any region card to select it. The recommended dates and satellite layer auto-fill. Cloud risk badge (☀️ / ⛅ / ☁️) tells you how likely you are to get clear imagery.
+
+2. **Custom tab** — enter lat/lon, before/after dates, and analysis type manually.
+
+3. **Satellite Layer** — choose the imagery source. For most regions, leave on VIIRS (daily, 375m). Use Sentinel or Landsat for sharper 30m imagery (they have less frequent passes so the retry logic may search ±7 days).
+
+4. **Run Analysis** button — activates once a region is selected. Click to start.
+
+**Right panel — Results:**
+
+- A live progress log appears while the analysis runs (30–90 seconds)
+- When complete, the result loads automatically showing:
+  - Before/after satellite images side by side
+  - Land cover breakdown (forest %, urban %, water %, cleared %)
+  - Change summary and environmental impact (written by Claude)
+  - Quantified metrics (area changed in km², carbon emissions if applicable)
+  - API cost
+
+**Past Results sidebar** — all previous analyses are listed at the bottom of the left panel. Click any to reload without re-running.
+
+---
+
+---
+
+# Method 2 — Terminal / VS Code
+
+## All Commands (run from project root)
+
+### List available preset regions
+```bash
+python src/services/satellite/analyzer.py --list
+```
+
+### Run a preset region (fastest — uses recommended dates and layer)
+```bash
+python src/services/satellite/analyzer.py dubai
 python src/services/satellite/analyzer.py las_vegas
-```
-
-### Option 2: Analyze Custom Location
-
-```bash
-python src/services/satellite/analyzer.py \
-  --lat -3.0 \
-  --lon -60.0 \
-  --before 2024-01-01 \
-  --after 2025-01-01 \
-  --name "My Forest Site" \
-  --type deforestation
-```
-
-### List Available Regions
-
-```bash
-python src/services/satellite/analyzer.py --list
-```
-
-## Available Pre-defined Regions
-
-| Region Key | Location | Type | Recommended For |
-|------------|----------|------|-----------------|
-| `amazon_basin` | Amazon Rainforest, Brazil | Deforestation | Forest loss monitoring |
-| `amazon_rondonia` | Rondônia, Brazil | Deforestation | Heavy deforestation area |
-| `arctic_greenland` | Greenland Ice Sheet | Ice melt | Arctic monitoring |
-| `las_vegas` | Las Vegas, Nevada | Urban sprawl | Desert urbanization |
-| `dubai` | Dubai, UAE | Urban sprawl | Coastal development |
-| `california_forests` | N. California | Fire damage | Wildfire impact |
-| `congo_basin` | Congo Rainforest, DRC | Deforestation | Tropical forest |
-
-## Analysis Types
-
-- **deforestation**: Forest loss detection and carbon emission estimates
-- **ice_melt**: Ice/snow coverage changes
-- **urban_sprawl**: Urban development expansion
-- **general**: General land cover change analysis
-
-## Output
-
-### Analysis Results
-
-The tool generates three types of reports in the `results/` folder:
-
-**1. JSON Report** (`*_analysis.json`)
-- Complete analysis data
-- Vision API responses
-- All metrics and calculations
-- API cost tracking
-
-**2. Markdown Report** (`*_report.md`)
-- Human-readable summary
-- Key findings and metrics
-- Environmental impact assessment
-- Links to satellite images
-
-**3. CSV Metrics** (`*_metrics.csv`)
-- Spreadsheet-ready data
-- Key metrics for comparison
-- Good for tracking multiple locations
-
-### Example Output Structure
-
-```json
-{
-  "location": {
-    "name": "Amazon Basin",
-    "lat": -3.4653,
-    "lon": -62.2159
-  },
-  "time_period": {
-    "before": "2024-01-01",
-    "after": "2025-01-01",
-    "days_elapsed": 365
-  },
-  "changes": {
-    "change_detected": true,
-    "change_type": "deforestation",
-    "severity": "high",
-    "severity_score": 8,
-    "metrics": {
-      "forest_loss_km2": 22.2,
-      "forest_loss_pct": 18.0,
-      "carbon_emissions_tons": 4440
-    }
-  },
-  "api_cost": {
-    "total_cost_usd": 0.085
-  }
-}
-```
-
-## Troubleshooting
-
-### "Claude API key not found!"
-- Ensure `.env` file exists in project root
-- Verify `CLAUDE_API_KEY` is set correctly
-- No spaces around the `=` sign
-
-### "GIBS API request failed"
-- Check internet connection
-- Verify coordinates are valid (lat: -90 to 90, lon: -180 to 180)
-- GIBS might be temporarily down (check https://www.earthdata.nasa.gov/gibs)
-- Some regions may not have recent imagery
-
-### "No imagery available for date"
-- GIBS may not have imagery for the exact date requested
-- Try nearby dates (±1-3 days)
-- Some satellite products have different temporal coverage:
-  - Landsat: 16-day repeat cycle
-  - Sentinel-2: 5-day repeat cycle
-  - MODIS/VIIRS: Daily coverage
-- Some locations have limited satellite coverage
-
-### Import Errors
-- Install required packages: `pip install anthropic python-dotenv requests pillow`
-- Ensure Python 3.8+ is installed
-- Run from project root directory
-
-### "Invalid image from GIBS"
-- GIBS returns XML errors when no data available
-- Try a different date or satellite product (use `--layer` parameter)
-- Check if the region has cloud-free imagery for that date
-
-## API Costs
-
-The analyzer uses Claude Sonnet 4. Typical costs per analysis:
-
-- **Single location analysis**: $0.05 - $0.15
-  - 2 vision API calls (before/after images)
-  - 1 text API call (comparison analysis)
-- **Batch analysis** (multiple locations): ~$0.10 per location
-
-Costs are tracked and displayed after each analysis. Use caching to reduce costs for repeated analyses.
-
-## Advanced Usage
-
-### Custom Output Path
-
-```bash
-python src/services/satellite/analyzer.py amazon_basin --output my_analysis.json
-```
-
-### Select Satellite Product
-
-You can specify which satellite product to use:
-
-```bash
-# Use Landsat (default, 30m resolution)
-python src/services/satellite/analyzer.py amazon_basin --layer landsat
-
-# Use Sentinel-2 (30m resolution, more frequent)
-python src/services/satellite/analyzer.py amazon_basin --layer sentinel
-
-# Use MODIS Terra (daily, 250m resolution)
-python src/services/satellite/analyzer.py amazon_basin --layer modis_terra
-
-# Use VIIRS (daily, 375m resolution)
-python src/services/satellite/analyzer.py amazon_basin --layer viirs_day
-```
-
-**Available Layers:**
-- `landsat` - HLS Landsat 8/9 (30m, 16-day repeat)
-- `sentinel` - HLS Sentinel-2 (30m, 5-day repeat)
-- `modis_terra` - MODIS Terra True Color (250m, daily)
-- `modis_aqua` - MODIS Aqua True Color (250m, daily)
-- `viirs_day` - VIIRS SNPP True Color (375m, daily)
-
-### Programmatic Usage
-
-```python
-from analyzer import SatelliteAnalyzer
-
-# Initialize
-analyzer = SatelliteAnalyzer()
-
-# Analyze region
-result = analyzer.analyze_region('amazon_basin')
-
-# Or analyze custom location
-result = analyzer.analyze_location(
-    lat=-3.0,
-    lon=-60.0,
-    before_date='2024-01-01',
-    after_date='2025-01-01',
-    location_name='My Site',
-    analysis_type='deforestation'
-)
-
-# Access results
-print(f"Forest loss: {result['changes']['metrics']['forest_loss_km2']} km²")
-print(f"Carbon emissions: {result['changes']['metrics']['carbon_emissions_tons']} tons")
-```
-
-## Sample Commands
-
-```bash
-# Quick test with demo region
-python src/services/satellite/analyzer.py amazon_basin
-
-# Custom Amazon location with specific dates
-python src/services/satellite/analyzer.py \
-  --lat -3.4653 \
-  --lon -62.2159 \
-  --before 2023-06-01 \
-  --after 2024-06-01 \
-  --name "Amazon Monitoring Site" \
-  --type deforestation
-
-# Arctic ice monitoring
 python src/services/satellite/analyzer.py arctic_greenland
-
-# Urban development tracking
-python src/services/satellite/analyzer.py \
-  --lat 25.2048 \
-  --lon 55.2708 \
-  --before 2020-01-01 \
-  --after 2024-01-01 \
-  --name "Dubai Development" \
-  --type urban_sprawl
-
-# List all available pre-defined regions
-python src/services/satellite/analyzer.py --list
+python src/services/satellite/analyzer.py amazon_basin
+python src/services/satellite/analyzer.py delhi_ncr
+python src/services/satellite/analyzer.py congo_basin
+python src/services/satellite/analyzer.py california_forests
 ```
 
-## Notes
+### Run with custom coordinates (single-line, no backslashes)
+```bash
+python src/services/satellite/analyzer.py --lat 25.2048 --lon 55.2708 --before 2018-02-01 --after 2024-02-01 --name "Dubai UAE" --type urban_sprawl
+```
 
-- First run will show the location of the loaded `.env` file
-- Satellite images are cached in `data/downloads/` folder
-- Results are saved with timestamps to prevent overwriting
-- Images are organized by location name
-- GIBS provides open-access imagery - no API key or registration required
-- Multiple satellite products available (Landsat, Sentinel, MODIS, VIIRS)
-- Imagery is updated daily from NASA's Earth observation satellites
-- Default product is Landsat (HLS) at 30m resolution
+```bash
+python src/services/satellite/analyzer.py --lat 28.6139 --lon 77.2090 --before 2019-02-01 --after 2024-02-01 --name "Delhi NCR India" --type urban_sprawl
+```
 
-## Error Handling
+```bash
+python src/services/satellite/analyzer.py --lat 12.9716 --lon 77.5946 --before 2019-02-01 --after 2024-02-01 --name "Bengaluru India" --type urban_sprawl
+```
 
-The tool includes comprehensive error handling with:
-- Step-by-step progress indicators (Steps 1-5)
-- Detailed error messages with troubleshooting tips
-- Full tracebacks for debugging
-- Graceful degradation (continues when possible)
+### Run with a specific satellite layer
+```bash
+python src/services/satellite/analyzer.py --lat 28.6139 --lon 77.2090 --before 2019-02-01 --after 2024-02-01 --name "Delhi NCR India" --type urban_sprawl --layer sentinel
+```
 
-If you encounter errors:
-1. Read the error message and troubleshooting tips
-2. Check the full traceback for details
-3. Verify all prerequisites are met
-4. Check API keys and internet connection
-5. Report issues with full error output
+```bash
+python src/services/satellite/analyzer.py --lat 28.6139 --lon 77.2090 --before 2019-02-01 --after 2024-02-01 --name "Delhi NCR India" --type urban_sprawl --layer landsat
+```
 
-## Contributing
+### Available `--layer` options
 
-When adding new regions to `satellite_config.py`:
-- Include coordinates, type, and description
-- Add recommended dates for best imagery
-- Test coordinates work with NASA API
-- Document in this README
+| Flag | Satellite | Resolution | Coverage |
+|---|---|---|---|
+| `viirs_day` | VIIRS SNPP | 375m | Daily ← **default** |
+| `modis_terra` | MODIS Terra | 250m | Daily |
+| `modis_aqua` | MODIS Aqua | 250m | Daily |
+| `sentinel` | Sentinel-2 | 30m | Every 5 days |
+| `landsat` | Landsat 8/9 | 30m | Every 16 days |
 
-## Data Sources
+### Available `--type` options
 
-- **Satellite Imagery**: NASA GIBS (Global Imagery Browse Services)
-  - Landsat 8/9 (HLS L30) - 30m resolution
-  - Sentinel-2 (HLS S30) - 30m resolution
-  - MODIS Terra/Aqua - 250m resolution
-  - VIIRS SNPP - 375m resolution
-- **AI Analysis**: Anthropic Claude Sonnet 4 Vision API
-- **Carbon Estimates**: Based on IPCC forest biomass data
+| Flag | Use for |
+|---|---|
+| `general` | Unknown/mixed change (default) |
+| `deforestation` | Forest loss, carbon emission estimates |
+| `urban_sprawl` | Urban expansion, infrastructure growth |
+| `ice_melt` | Glacier or sea ice retreat |
 
-## About GIBS
+## VS Code F5 Launch Configs
 
-NASA's Global Imagery Browse Services (GIBS) provides full-resolution satellite imagery from multiple NASA Earth observation missions. Benefits:
+The following run configurations are available in `.vscode/launch.json` — press F5 and select from the dropdown:
 
-- **Open Access**: No API key or registration required
-- **Daily Updates**: Fresh imagery from multiple satellites
-- **Multiple Products**: Access to Landsat, Sentinel-2, MODIS, VIIRS
-- **WMS/WMTS Standards**: Uses OGC web service protocols
-- **High Performance**: Optimized for fast image delivery
-- **Free**: Completely free for all users
+- **🛰️ Satellite API (uvicorn :8002)** — starts the API server
 
-Learn more: https://www.earthdata.nasa.gov/gibs
+## Output Files
+
+Results are saved to `src/services/satellite/results/` with three files per run:
+
+| File | Contents |
+|---|---|
+| `*_analysis.json` | Complete raw data — all metrics, vision responses, image paths, cost |
+| `*_report.md` | Human-readable Markdown summary |
+| `*_metrics.csv` | Spreadsheet-ready row of key metrics |
+
+Downloaded satellite images are saved to `src/services/satellite/data/downloads/<location_name>/`.
+
+---
+
+## Preset Regions Reference
+
+| Key | Location | Type | Cloud risk | Best months |
+|---|---|---|---|---|
+| `amazon_basin` | Amazon, Brazil | Deforestation | ☁️ High | Aug–Sep (dry season) |
+| `amazon_rondonia` | Rondônia, Brazil | Deforestation | ☁️ High | Aug–Sep |
+| `congo_basin` | Congo DRC | Deforestation | ⛅ Medium | Jun–Aug |
+| `las_vegas` | Nevada, USA | Urban sprawl | ☀️ Low | Any time |
+| `dubai` | UAE | Urban sprawl | ☀️ Low | Any time |
+| `delhi_ncr` | India | Urban sprawl | ⛅ Medium | Jan–Feb (avoid Nov for smog) |
+| `arctic_greenland` | Greenland | Ice melt | ☀️ Low | Jul–Aug (polar summer) |
+| `california_forests` | N. California | Fire damage | ☀️ Low | Sep–Oct (post-fire) |
+
+---
+
+## Why Images Are Sometimes Blurry or Blank
+
+**Blurry** — VIIRS has 375m native resolution. If the bounding box is too small relative to the image canvas size, GIBS has to upscale the pixels, producing a blocky result. The default `0.5°` bbox (~55km) is calibrated for VIIRS. Use `sentinel` or `landsat` for 30m sharp imagery.
+
+**White/blank** — Full cloud cover. The fetcher automatically retries ±7 days from your requested date to find a cloud-free image. If all 14 retry dates are also cloudy, it gives up and raises an error. Avoid the Amazon and Congo during rainy season (Nov–May). Avoid Delhi in November (winter smog).
+
+**"Image not available" placeholder in UI** — The image file was downloaded in a previous run but has since been deleted from `data/downloads/`. Re-run the analysis to regenerate the images.
+
+---
+
+## API Cost
+
+Each analysis makes exactly **3 Claude API calls**:
+- 2 Vision calls (before and after images)
+- 1 Text call (comparison and change detection)
+
+Typical cost: **$0.02–$0.05 per run**.
+
+NASA GIBS image downloads are free — no API key, no cost, no rate limits.
